@@ -11,3 +11,4 @@ dnspython
 pyfiglet
 typer
 colorama
+PyYAML

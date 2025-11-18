@@ -1,0 +1,5 @@
+tor:
+  enabled: false
+  control_port: 9051
+  socks_port: 9050
+  password: "changeme"
