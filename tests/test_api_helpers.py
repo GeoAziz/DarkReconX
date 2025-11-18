@@ -69,8 +69,9 @@ def test_whoisxml_normalization_and_refresh(monkeypatch):
     r1 = api_helpers.enrich_with_whoisxml(domain, api_key="KEY", use_cache=True, ttl=10, force_refresh=True)
     assert r1.get("from_cache") is False
     assert isinstance(r1.get("data"), dict)
-    assert "whois" in r1["data"]
+    assert r1["data"]["provider"] == "whoisxml"
+    assert "registrar" in r1["data"]
 
     # ensure cached present: call with use_cache=True and force_refresh=False
     r2 = api_helpers.enrich_with_whoisxml(domain, api_key="KEY", use_cache=True, ttl=3600, force_refresh=False)
-    assert r2.get("from_cache") is True or "whois" in r2.get("data")
+    assert r2.get("from_cache") is True or r2["data"]["provider"] == "whoisxml"

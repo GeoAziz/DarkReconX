@@ -1,0 +1,132 @@
+Metadata-Version: 2.4
+Name: darkreconx
+Version: 0.1.0
+Summary: Modular OSINT reconnaissance framework with Tor support
+Author: DarkReconX Contributors
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: requests>=2.31.0
+Requires-Dist: PySocks>=1.7.1
+Requires-Dist: stem>=1.8.2
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: typer>=0.12.0
+Requires-Dist: rich>=13.7.0
+Requires-Dist: pyfiglet>=1.0.2
+Requires-Dist: pyyaml>=6.0.1
+Requires-Dist: python-whois>=0.9.4
+Requires-Dist: dnspython>=2.6.1
+Requires-Dist: python-dotenv>=1.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
+Dynamic: license-file
+
+██████╗  █████╗ ██████╗ ██╗  ██╗██████╗ ███████╗ ██████╗ ██████╗ ███╗   ██╗
+██╔══██╗██╔══██╗██╔══██╗██║ ██╔╝██╔══██╗██╔════╝██╔════╝ ██╔══██╗████╗  ██║
+██████╔╝███████║██████╔╝█████╔╝ ██║  ██║█████╗  ██║  ███╗██████╔╝██╔██╗ ██║
+██╔═══╝ ██╔══██║██╔═══╝ ██╔═██╗ ██║  ██║██╔══╝  ██║   ██║██╔══██╗██║╚██╗██║
+██║     ██║  ██║██║     ██║  ██╗██████╔╝███████╗╚██████╔╝██║  ██║██║ ╚████║
+╚═╝     ╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═════╝ ╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝
+															 DarkReconX Framework
+
+DarkReconX is a fully modular cyber-recon framework designed for hands-on
+cybersecurity learning and professional OSINT research.
+
+The toolkit integrates:
+
+- Tor-routed anonymous reconnaissance
+- Dark Web marketplace & forum scanners
+- Open-source intelligence (OSINT) modules
+- Threat intelligence utilities
+- Plug-and-play module architecture
+
+The project is built around an 8-week roadmap covering HTTP engine
+development, Tor integration, automated recon tools, darkweb intelligence
+scrapers, malware OSINT modules, and API integrations.
+
+Designed for students, researchers, ethical hackers, and cyber analysts who
+want real-world, hands-on, practical cybersecurity tooling experience.
+
+License recommendation
+----------------------
+
+Use the MIT License. It allows others to use and contribute freely while
+keeping a permissive and standard legal footing for OSINT frameworks.
+
+Quick start (PowerShell)
+------------------------
+
+Create virtual environment and activate
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1   # PowerShell
+```
+
+Install dependencies
+
+```powershell
+pip install -r requirements.txt
+```
+
+Run CLI launcher
+
+```powershell
+python .\cli\main.py
+```
+
+Notes
+-----
+- If dependencies are not installed the CLI will show import errors — run
+	`pip install -r requirements.txt` first.
+- Add your GitHub remote and push when ready.
+
+API keys & .env
+----------------
+
+DarkReconX supports optional third-party API integrations (for example
+VirusTotal) to enrich findings. For local development you can store
+credentials in a top-level `.env` file (this repo already includes
+`.env` in `.gitignore` to avoid accidental commits).
+
+Environment variables supported by the framework:
+- `VT_API_KEY` — VirusTotal v3 API key used by the subfinder enrichment helper.
+- `TOR_PASSWORD`, `TOR_CONTROL_PORT`, `TOR_SOCKS_PORT` — override Tor config.
+
+The `config` loader will automatically read `.env` (if present) and overlay
+these values, so modules can pick up API keys from `get_config()` or from
+`os.environ`.
+
+Recommended reconnaissance stack
+--------------------------------
+
+Based on current priorities, the following stack is recommended to replace
+SecurityTrails and form the baseline enrichment pipeline:
+
+- SUBDOMAINS:
+	- subfinder (local DNS/wordlist)
+	- crt.sh (certificate-to-subdomain lookups)
+	- VirusTotal (API-driven domain/subdomain intelligence)
+
+- DNS + HISTORICAL DNS:
+	- DNSDB Scout (free pDNS)
+	- VirusTotal (DNS records)
+	- crt.sh (cert → DNS)
+
+- WHOIS:
+	- whoisxml (free tier)
+	- VirusTotal (WHOIS via VT)
+
+- IP INTELLIGENCE:
+	- ipinfo.io (free tier)
+	- VirusTotal (IP relations)
+
+- INFRASTRUCTURE ENUMERATION:
+	- httpx, naabu, dnsx
+	- crt.sh
+	- VirusTotal graphs
+
+See `CONTRIBUTING_MODULES.md` for how to add or wire these integrations into
+modules safely and how to mock them for networkless CI.

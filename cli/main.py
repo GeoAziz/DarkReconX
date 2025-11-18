@@ -253,7 +253,14 @@ def subfinder(
         except Exception as e:
             console.print(f"[red]Async mode unavailable: {e}[/red]")
             raise typer.Exit(2)
-        finder = AsyncSubdomainFinder(domain, wordlist=wordlist, concurrency=(workers or 100), verbose=bool((ctx.obj or {}).get("verbose", False)) if ctx is not None else False)
+        finder = AsyncSubdomainFinder(
+            domain,
+            wordlist=wordlist,
+            concurrency=(workers or 100),
+            verbose=bool((ctx.obj or {}).get("verbose", False)) if ctx is not None else False,
+            verify_http=verify_http,
+            http_timeout=float(verify_timeout),
+        )
     else:
         finder = SubdomainFinder(
         domain,
