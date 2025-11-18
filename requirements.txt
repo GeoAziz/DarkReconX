@@ -1,0 +1,13 @@
+requests
+beautifulsoup4
+selenium
+httpx
+rich
+asyncio
+aiohttp
+stem
+python-whois
+dnspython
+pyfiglet
+typer
+colorama
