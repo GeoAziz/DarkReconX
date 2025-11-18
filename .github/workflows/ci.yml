@@ -22,4 +22,24 @@ jobs:
           pip install pytest
       - name: Run tests
         run: |
+          # ensure results directory exists for tests that write/read results
+          mkdir -p results
           pytest -q
+  smoke-cli:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install minimal dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run subfinder CLI smoke check (non-Tor)
+        run: |
+          # Run a very small smoke check of the CLI to catch runtime import regressions.
+          # This requires outbound network access on the runner (http/https).
+          python -m cli.main subfinder example.com --no-tor --workers 1

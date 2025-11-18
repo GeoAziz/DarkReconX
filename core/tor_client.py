@@ -54,14 +54,15 @@ class TorClient:
             resp.raise_for_status()
             return resp.text
         except Exception as e:
-            console.print(f"[red][TOR ERROR][/red] {e}")
+            # Print a concise, user-friendly message instead of long urllib3 trace text
+            console.print(f"[yellow][TOR ERROR][/yellow] Could not GET {url} via Tor. Target may be unreachable or Tor may not be routing correctly.")
             return None
 
     def head(self, url: str, timeout: int = 10, **kwargs) -> Optional[requests.Response]:
         try:
             return self.session.head(url, timeout=timeout, **kwargs)
         except Exception as e:
-            console.print(f"[red][TOR ERROR][/red] {e}")
+            console.print(f"[yellow][TOR ERROR][/yellow] Could not perform HEAD to {url} via Tor. Skipping verification for this host.")
             return None
 
     def post(self, url: str, data=None, timeout: int = 15, **kwargs) -> Optional[str]:
@@ -78,7 +79,7 @@ class TorClient:
             resp.raise_for_status()
             return resp.text
         except Exception as e:
-            console.print(f"[red][TOR ERROR][/red] {e}")
+            console.print(f"[yellow][TOR ERROR][/yellow] Could not POST to {url} via Tor. Target or Tor proxy may be unreachable.")
             return None
 
     def put(self, url: str, data=None, timeout: int = 15, **kwargs) -> Optional[str]:
@@ -87,7 +88,7 @@ class TorClient:
             resp.raise_for_status()
             return resp.text
         except Exception as e:
-            console.print(f"[red][TOR ERROR][/red] {e}")
+            console.print(f"[yellow][TOR ERROR][/yellow] Could not PUT to {url} via Tor.")
             return None
 
     def delete(self, url: str, timeout: int = 15, **kwargs) -> Optional[str]:
@@ -96,7 +97,7 @@ class TorClient:
             resp.raise_for_status()
             return resp.text
         except Exception as e:
-            console.print(f"[red][TOR ERROR][/red] {e}")
+            console.print(f"[yellow][TOR ERROR][/yellow] Could not DELETE {url} via Tor.")
             return None
 
     def options(self, url: str, timeout: int = 15, **kwargs) -> Optional[str]:
@@ -105,7 +106,7 @@ class TorClient:
             resp.raise_for_status()
             return resp.text
         except Exception as e:
-            console.print(f"[red][TOR ERROR][/red] {e}")
+            console.print(f"[yellow][TOR ERROR][/yellow] Could not OPTIONS {url} via Tor.")
             return None
 
     def patch(self, url: str, data=None, timeout: int = 15, **kwargs) -> Optional[str]:
@@ -114,7 +115,7 @@ class TorClient:
             resp.raise_for_status()
             return resp.text
         except Exception as e:
-            console.print(f"[red][TOR ERROR][/red] {e}")
+            console.print(f"[yellow][TOR ERROR][/yellow] Could not PATCH {url} via Tor.")
             return None
 
 

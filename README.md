@@ -57,3 +57,51 @@ Notes
 - If dependencies are not installed the CLI will show import errors — run
 	`pip install -r requirements.txt` first.
 - Add your GitHub remote and push when ready.
+
+API keys & .env
+----------------
+
+DarkReconX supports optional third-party API integrations (for example
+VirusTotal) to enrich findings. For local development you can store
+credentials in a top-level `.env` file (this repo already includes
+`.env` in `.gitignore` to avoid accidental commits).
+
+Environment variables supported by the framework:
+- `VT_API_KEY` — VirusTotal v3 API key used by the subfinder enrichment helper.
+- `TOR_PASSWORD`, `TOR_CONTROL_PORT`, `TOR_SOCKS_PORT` — override Tor config.
+
+The `config` loader will automatically read `.env` (if present) and overlay
+these values, so modules can pick up API keys from `get_config()` or from
+`os.environ`.
+
+Recommended reconnaissance stack
+--------------------------------
+
+Based on current priorities, the following stack is recommended to replace
+SecurityTrails and form the baseline enrichment pipeline:
+
+- SUBDOMAINS:
+	- subfinder (local DNS/wordlist)
+	- crt.sh (certificate-to-subdomain lookups)
+	- VirusTotal (API-driven domain/subdomain intelligence)
+
+- DNS + HISTORICAL DNS:
+	- DNSDB Scout (free pDNS)
+	- VirusTotal (DNS records)
+	- crt.sh (cert → DNS)
+
+- WHOIS:
+	- whoisxml (free tier)
+	- VirusTotal (WHOIS via VT)
+
+- IP INTELLIGENCE:
+	- ipinfo.io (free tier)
+	- VirusTotal (IP relations)
+
+- INFRASTRUCTURE ENUMERATION:
+	- httpx, naabu, dnsx
+	- crt.sh
+	- VirusTotal graphs
+
+See `CONTRIBUTING_MODULES.md` for how to add or wire these integrations into
+modules safely and how to mock them for networkless CI.

@@ -1,0 +1,46 @@
+name: Smoke (networkless)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  smoke-networkless:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # install only what's needed for import/runtime of core pieces
+          pip install -r requirements.txt
+      - name: Run networkless smoke script
+        run: |
+          python - <<'PY'
+import sys
+from core.loader import discover_modules, load_module
+
+print('Discovering modules...')
+mods = discover_modules()
+print(f'Found modules: {list(mods.keys())}')
+if 'template' not in mods:
+    print('ERROR: template module not discovered', file=sys.stderr)
+    sys.exit(2)
+
+print('Loading template module...')
+tmpl = load_module('template')
+print('Running template module (should not perform network operations)')
+res = tmpl.run('smoke-test')
+print('Template run result:', res)
+if not isinstance(res, dict) or res.get('result') != 'smoke-test':
+    print('ERROR: unexpected template result', file=sys.stderr)
+    sys.exit(3)
+
+print('Networkless smoke completed successfully')
+PY

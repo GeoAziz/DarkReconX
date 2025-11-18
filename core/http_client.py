@@ -27,7 +27,7 @@ class HTTPClient:
         :class:`TorClient`.
     """
 
-    def __init__(self, use_tor: Optional[bool] = None):
+    def __init__(self, use_tor: Optional[bool] = None, verbose: bool = False, timeout: int = 15):
         # If not explicitly passed, read from config/default.yml
         cfg = _CFG.config if hasattr(_CFG, "config") else {}
         if use_tor is None:
@@ -40,6 +40,8 @@ class HTTPClient:
             self.client = TorClient()
         else:
             self.client = requests.Session()
+        self.verbose = bool(verbose)
+        self.timeout = int(timeout)
 
     def get(self, url: str, **kwargs) -> Optional[str]:
         """Perform a GET request and return response text or None on error."""
@@ -47,11 +49,24 @@ class HTTPClient:
             if self.use_tor:
                 return self.client.get(url, **kwargs)
             else:
-                resp = self.client.get(url, timeout=10, **kwargs)
+                resp = self.client.get(url, timeout=self.timeout, **kwargs)
                 resp.raise_for_status()
                 return resp.text
         except Exception as e:
-            console.print(f"[red]HTTP GET Error:[/red] {e}")
+            # If a non-Tor GET failed and the URL is http, try https as a fallback
+            if not self.use_tor and isinstance(url, str) and url.startswith("http://"):
+                try:
+                    fallback = url.replace("http://", "https://", 1)
+                    resp = self.client.get(fallback, timeout=self.timeout, **kwargs)
+                    resp.raise_for_status()
+                    return resp.text
+                except Exception:
+                    pass
+
+            if self.verbose:
+                console.print(f"[red]HTTP GET Error:[/red] {e}")
+            else:
+                console.print(f"[red]HTTP GET Error:[/red] {e.__class__.__name__}: {str(e)}")
             return None
 
     def post(self, url: str, data=None, **kwargs) -> Optional[str]:
@@ -60,11 +75,36 @@ class HTTPClient:
                 # TorClient has a post implementation
                 return self.client.post(url, data=data, **kwargs)
             else:
-                resp = self.client.post(url, data=data, timeout=10, **kwargs)
+                resp = self.client.post(url, data=data, timeout=self.timeout, **kwargs)
                 resp.raise_for_status()
                 return resp.text
         except Exception as e:
-            console.print(f"[red]HTTP POST Error:[/red] {e}")
+            if self.verbose:
+                console.print(f"[red]HTTP POST Error:[/red] {e}")
+            else:
+                console.print(f"[red]HTTP POST Error:[/red] {e.__class__.__name__}: {str(e)}")
+            return None
+
+    def head(self, url: str, **kwargs) -> Optional[int]:
+        """Perform a HEAD request and return status code or None on error."""
+        try:
+            if self.use_tor:
+                # TorClient implements head as well
+                resp = self.client.head(url, **kwargs)
+                # Try to extract status_code if present
+                code = getattr(resp, "status_code", None)
+                if code is not None:
+                    return int(code)
+                # fallback: truthy response considered success
+                return 200 if resp else None
+            else:
+                resp = self.client.head(url, timeout=self.timeout, **kwargs)
+                return int(resp.status_code)
+        except Exception as e:
+            if self.verbose:
+                console.print(f"[red]HTTP HEAD Error:[/red] {e}")
+            else:
+                console.print(f"[red]HTTP HEAD Error:[/red] {e.__class__.__name__}: {str(e)}")
             return None
 
 
