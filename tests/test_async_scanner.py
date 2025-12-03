@@ -1,8 +1,10 @@
 """Unit tests for AsyncSubdomainFinder with mocked async DNS and HTTP."""
-import pytest
+
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Ensure project root is in path
 ROOT = Path(__file__).resolve().parents[1]

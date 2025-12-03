@@ -10,6 +10,7 @@ from typing import Optional
 
 try:
     from rich.logging import RichHandler
+
     _RICH = True
 except Exception:
     RichHandler = logging.StreamHandler

@@ -1,19 +1,19 @@
-import typer
-import pyfiglet
-from rich.console import Console
+import importlib
+import inspect
 import sys
 from pathlib import Path
+from typing import Optional
+
+import pyfiglet
+import typer
+import yaml
+from rich.console import Console
 
 # Ensure project root is on sys.path so `import config` and other top-level
 # packages work when running this file directly (python cli/main.py).
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
-import importlib
-import inspect
-from pathlib import Path
-from typing import Optional
-import yaml
 
 console = Console()
 app = typer.Typer(invoke_without_command=True)
@@ -132,9 +132,7 @@ def run_module(module: str, target: Optional[str] = None, ctx: typer.Context = N
 
     if callable_obj is None:
         # look for a class defined in this module and instantiate it
-        classes = [
-            cls for name, cls in inspect.getmembers(mod, inspect.isclass) if cls.__module__ == module_path
-        ]
+        classes = [cls for name, cls in inspect.getmembers(mod, inspect.isclass) if cls.__module__ == module_path]
         if not classes:
             console.print(f"[yellow]No runnable class or function found in {module_path}[/yellow]")
             raise typer.Exit(1)
@@ -193,7 +191,6 @@ def run_module(module: str, target: Optional[str] = None, ctx: typer.Context = N
         console.print(f"[red]Error running module {module}: {e}[/red]")
 
 
-
 @app.command("whois")
 def whois(domain: str, tor: Optional[bool] = None, output: Optional[str] = None, ctx: typer.Context = None):
     """WHOIS Lookup Tool"""
@@ -211,14 +208,15 @@ def whois(domain: str, tor: Optional[bool] = None, output: Optional[str] = None,
     mod.run(domain, use_tor=use_tor, output=output)
 
 
-
 @app.command("subfinder")
 def subfinder(
     domain: str,
     wordlist: Optional[str] = None,
     tor: Optional[bool] = None,
     workers: Optional[int] = typer.Option(None, "--workers", help="Override number of concurrent workers"),
-    verify_http: bool = typer.Option(False, "--verify-http", help="Perform HEAD requests to discovered subdomains (respects --tor)"),
+    verify_http: bool = typer.Option(
+        False, "--verify-http", help="Perform HEAD requests to discovered subdomains (respects --tor)"
+    ),
     verify_timeout: int = typer.Option(10, "--verify-timeout", help="Timeout (seconds) for HEAD verification"),
     verify_retries: int = typer.Option(2, "--verify-retries", help="Number of retries for HEAD verification"),
     verify_backoff: float = typer.Option(0.5, "--verify-backoff", help="Base backoff (seconds) for HEAD verification"),
@@ -263,17 +261,17 @@ def subfinder(
         )
     else:
         finder = SubdomainFinder(
-        domain,
-        wordlist=wordlist,
-        use_tor=use_tor,
-        workers=workers,
-        verify_http=verify_http,
-        verify_timeout=verify_timeout,
-        verify_retries=verify_retries,
-        verify_backoff=verify_backoff,
-        verbose=bool((ctx.obj or {}).get("verbose", False)) if ctx is not None else False,
-    )
-    # set API options if provided
+            domain,
+            wordlist=wordlist,
+            use_tor=use_tor,
+            workers=workers,
+            verify_http=verify_http,
+            verify_timeout=verify_timeout,
+            verify_retries=verify_retries,
+            verify_backoff=verify_backoff,
+            verbose=bool((ctx.obj or {}).get("verbose", False)) if ctx is not None else False,
+        )
+        # set API options if provided
         if api:
             try:
                 finder.set_api(api, api_key=api_key)
@@ -284,12 +282,15 @@ def subfinder(
                     finder.set_api_refresh(True)
                 # env var API_CACHE_BYPASS will also be honored by helpers
             except Exception:
-                console.print(f"[yellow]Warning: API {api} not available or failed to configure; continuing without API enrichment[/yellow]")
+                console.print(
+                    f"[yellow]Warning: API {api} not available or failed to configure; continuing without API enrichment[/yellow]"
+                )
 
     # run and save outputs according to format
     results = finder.run()
     # ensure results/ exists at project root
     from pathlib import Path
+
     root = Path(__file__).resolve().parents[1]
     results_dir = root / "results"
     results_dir.mkdir(exist_ok=True)

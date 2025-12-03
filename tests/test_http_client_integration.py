@@ -1,5 +1,6 @@
-from core.http_client import HTTPClient
 import pytest
+
+from core.http_client import HTTPClient
 
 
 def test_httpclient_direct_get():

@@ -1,8 +1,7 @@
-import pkgutil
 import importlib
 import inspect
 from pathlib import Path
-from typing import Dict, Type, List
+from typing import Dict, Type
 
 from core.module import BaseModule
 

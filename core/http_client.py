@@ -7,8 +7,10 @@ for modules to call.
 """
 
 from typing import Optional
+
 import requests
 from rich.console import Console
+
 from config.loader import get_config
 from core.tor_client import TorClient
 
@@ -122,7 +124,9 @@ if __name__ == "__main__":
         from core.tor_client import is_tor_available
 
         if not is_tor_available():
-            console.print("[yellow]Tor does not appear to be running locally (127.0.0.1:9050). Skipping Tor smoke test.[/yellow]")
+            console.print(
+                "[yellow]Tor does not appear to be running locally (127.0.0.1:9050). Skipping Tor smoke test.[/yellow]"
+            )
         else:
             tor_client = HTTPClient(use_tor=True)
             text2 = tor_client.get("http://httpbin.org/ip")

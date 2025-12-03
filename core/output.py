@@ -1,8 +1,9 @@
 import json
+from pathlib import Path
 from typing import Any, Iterable, List
+
 from rich.console import Console
 from rich.table import Table
-from pathlib import Path
 
 console = Console()
 

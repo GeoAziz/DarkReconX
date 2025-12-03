@@ -4,12 +4,15 @@ This module provides small, safe wrappers for several external providers
 with optional caching via `core.cache`. Each function accepts a `use_cache`
 boolean (default True) to allow bypassing the cache during testing.
 """
-from typing import Dict, Optional
+
 import logging
-import requests
-from urllib.parse import quote_plus
-from core import cache
 import os
+from typing import Dict, Optional
+from urllib.parse import quote_plus
+
+import requests
+
+from core import cache
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +30,15 @@ def _use_cache_override(use_cache: Optional[bool]) -> bool:
 def _normalize_virustotal(raw: Dict) -> Dict:
     # Normalize VT v3 responses into unified shape where possible.
     try:
-        out = {"provider": "virustotal", "hostname": None, "ip": None, "asn": None, "registrar": None, "location": {}, "raw": raw}
+        out = {
+            "provider": "virustotal",
+            "hostname": None,
+            "ip": None,
+            "asn": None,
+            "registrar": None,
+            "location": {},
+            "raw": raw,
+        }
         if not isinstance(raw, dict):
             return out
         data = raw.get("data") or raw
@@ -127,7 +138,9 @@ def enrich_with_securitytrails(domain: str, api_key: Optional[str], use_cache: O
     return {"securitytrails": None, "domain": domain}
 
 
-def enrich_with_virustotal(domain: str, api_key: Optional[str], use_cache: Optional[bool] = True, ttl: int = 3600, force_refresh: bool = False) -> Dict:
+def enrich_with_virustotal(
+    domain: str, api_key: Optional[str], use_cache: Optional[bool] = True, ttl: int = 3600, force_refresh: bool = False
+) -> Dict:
     """Query VirusTotal v3 for a domain with optional caching.
 
     Returns dict with either {'data': ...} or {'error': ...} and a
@@ -170,7 +183,9 @@ def enrich_with_virustotal(domain: str, api_key: Optional[str], use_cache: Optio
     return {"from_cache": False, "data": _normalize_virustotal(j)}
 
 
-def enrich_with_dnsdb(domain: str, api_key: Optional[str], use_cache: Optional[bool] = True, ttl: int = 3600, force_refresh: bool = False) -> Dict:
+def enrich_with_dnsdb(
+    domain: str, api_key: Optional[str], use_cache: Optional[bool] = True, ttl: int = 3600, force_refresh: bool = False
+) -> Dict:
     """Query DNSDB Scout or similar pDNS provider.
 
     This is a minimal implementation that assumes a generic GET endpoint;
@@ -211,7 +226,9 @@ def enrich_with_dnsdb(domain: str, api_key: Optional[str], use_cache: Optional[b
     return {"from_cache": False, "data": _normalize_dnsdb(j)}
 
 
-def enrich_with_whoisxml(domain: str, api_key: Optional[str], use_cache: Optional[bool] = True, ttl: int = 3600, force_refresh: bool = False) -> Dict:
+def enrich_with_whoisxml(
+    domain: str, api_key: Optional[str], use_cache: Optional[bool] = True, ttl: int = 3600, force_refresh: bool = False
+) -> Dict:
     """Query WhoisXML's WHOIS API (simple wrapper).
 
     Endpoint: https://www.whoisxmlapi.com/whoisserver/WhoisService?domainName={domain}&apiKey={apiKey}&outputFormat=JSON
@@ -249,7 +266,9 @@ def enrich_with_whoisxml(domain: str, api_key: Optional[str], use_cache: Optiona
     return {"from_cache": False, "data": _normalize_whoisxml(j)}
 
 
-def enrich_with_ipinfo(ip: str, api_key: Optional[str], use_cache: Optional[bool] = True, ttl: int = 3600, force_refresh: bool = False) -> Dict:
+def enrich_with_ipinfo(
+    ip: str, api_key: Optional[str], use_cache: Optional[bool] = True, ttl: int = 3600, force_refresh: bool = False
+) -> Dict:
     """Query ipinfo.io for IP intelligence. API token optional for elevated quota.
     Endpoint: https://ipinfo.io/{ip}/json?token={token}
     """

@@ -3,12 +3,12 @@
 This cache stores JSON blobs under `.cache/` keyed by SHA256 of the
 request key. Each entry includes a timestamp so TTLs can be honored.
 """
-from pathlib import Path
+
+import hashlib
 import json
 import time
-import hashlib
+from pathlib import Path
 from typing import Any, Optional
-
 
 CACHE_DIR = Path(__file__).resolve().parents[1] / ".cache"
 CACHE_DIR.mkdir(exist_ok=True)

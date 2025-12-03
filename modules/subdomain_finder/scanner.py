@@ -1,17 +1,16 @@
-import dns.resolver
-from rich.console import Console
-from pathlib import Path
-from typing import List, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from typing import List, Optional
 
-from core.http_client import HTTPClient
+import dns.resolver
+from rich.console import Console
+
 from config.loader import get_config
-from typing import Iterable
-from core.output import save_output
+from core.http_client import HTTPClient
 from modules.subdomain_finder import api as api_helpers
-import json
 
 console = Console()
 
@@ -109,7 +108,9 @@ class SubdomainFinder:
             return found
 
         # gather candidates
-        candidates = [line.strip() for line in wl_path.read_text(encoding="utf-8", errors="ignore").splitlines() if line.strip()]
+        candidates = [
+            line.strip() for line in wl_path.read_text(encoding="utf-8", errors="ignore").splitlines() if line.strip()
+        ]
 
         # use ThreadPoolExecutor to resolve concurrently
         with ThreadPoolExecutor(max_workers=self.workers) as ex:
@@ -136,9 +137,11 @@ class SubdomainFinder:
 
                         # if not last attempt, sleep with exponential backoff
                         if attempt < self.verify_retries:
-                            sleep_for = self.verify_backoff * (2 ** attempt)
+                            sleep_for = self.verify_backoff * (2**attempt)
                             if self.verbose:
-                                console.print(f"[blue]Verify attempt {attempt+1} failed for {res}; sleeping {sleep_for}s before retry[/blue]")
+                                console.print(
+                                    f"[blue]Verify attempt {attempt+1} failed for {res}; sleeping {sleep_for}s before retry[/blue]"
+                                )
                             time.sleep(sleep_for)
 
                     if code is None or code >= 400:
@@ -173,18 +176,42 @@ class SubdomainFinder:
                 for d in found:
                     res = None
                     if self.api_name in ("virustotal", "vt"):
-                        res = api_helpers.enrich_with_virustotal(d, self.api_key, use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True, ttl=3600, force_refresh=getattr(self, "api_force_refresh", False))
+                        res = api_helpers.enrich_with_virustotal(
+                            d,
+                            self.api_key,
+                            use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
+                            ttl=3600,
+                            force_refresh=getattr(self, "api_force_refresh", False),
+                        )
                     elif self.api_name in ("dnsdb",):
-                        res = api_helpers.enrich_with_dnsdb(d, self.api_key, use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True, ttl=3600, force_refresh=getattr(self, "api_force_refresh", False))
+                        res = api_helpers.enrich_with_dnsdb(
+                            d,
+                            self.api_key,
+                            use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
+                            ttl=3600,
+                            force_refresh=getattr(self, "api_force_refresh", False),
+                        )
                     elif self.api_name in ("whoisxml", "whois"):
-                        res = api_helpers.enrich_with_whoisxml(d, self.api_key, use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True, ttl=3600, force_refresh=getattr(self, "api_force_refresh", False))
+                        res = api_helpers.enrich_with_whoisxml(
+                            d,
+                            self.api_key,
+                            use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
+                            ttl=3600,
+                            force_refresh=getattr(self, "api_force_refresh", False),
+                        )
                     elif self.api_name in ("ipinfo",):
                         # ipinfo expects IP address; try resolving first (best-effort)
                         try:
                             import socket
 
                             ip = socket.gethostbyname(d)
-                            res = api_helpers.enrich_with_ipinfo(ip, self.api_key, use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True, ttl=3600, force_refresh=getattr(self, "api_force_refresh", False))
+                            res = api_helpers.enrich_with_ipinfo(
+                                ip,
+                                self.api_key,
+                                use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
+                                ttl=3600,
+                                force_refresh=getattr(self, "api_force_refresh", False),
+                            )
                         except Exception:
                             res = {"error": "resolve_failed", "domain": d}
                     else:

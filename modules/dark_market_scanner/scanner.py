@@ -1,5 +1,6 @@
 class DarkMarketScanner:
     """Placeholder for dark market scanner module."""
+
     def __init__(self):
         pass
 

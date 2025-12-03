@@ -1,11 +1,11 @@
-from core.module import BaseModule
-from core.output import print_json, save_output
-from core.logger import get_logger
-from core.http_client import HTTPClient
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any, Optional
 
 import whois as _pywhois
+
+from core.logger import get_logger
+from core.module import BaseModule
+from core.output import print_json, save_output
 
 logger = get_logger("whois_lookup")
 
@@ -19,7 +19,6 @@ class WhoisModule(BaseModule):
         super().__init__(**kwargs)
 
     def run(self, domain: str, use_tor: Optional[bool] = None, output: Optional[str] = None):
-        http = HTTPClient(use_tor=use_tor)
         try:
             # python-whois does DNS/network internally; callers should be aware
             w = _pywhois.whois(domain)

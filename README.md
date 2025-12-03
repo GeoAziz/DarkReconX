@@ -6,6 +6,11 @@
 ╚═╝     ╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═════╝ ╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝
 															 DarkReconX Framework
 
+[![CI Pipeline](https://github.com/GeoAziz/DarkReconX/actions/workflows/ci.yml/badge.svg)](https://github.com/GeoAziz/DarkReconX/actions)
+[![Smoke Tests](https://github.com/GeoAziz/DarkReconX/actions/workflows/smoke.yml/badge.svg)](https://github.com/GeoAziz/DarkReconX/actions)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![Code style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 DarkReconX is a fully modular cyber-recon framework designed for hands-on
 cybersecurity learning and professional OSINT research.
 
@@ -57,6 +62,80 @@ Notes
 - If dependencies are not installed the CLI will show import errors — run
 	`pip install -r requirements.txt` first.
 - Add your GitHub remote and push when ready.
+
+Development & Testing
+---------------------
+
+### Setup for Contributors
+
+Clone the repository and set up the development environment:
+
+```powershell
+git clone https://github.com/GeoAziz/DarkReconX.git
+cd DarkReconX
+python -m venv venv
+.\venv\Scripts\Activate.ps1   # PowerShell
+pip install -e ".[dev]"        # Install with dev dependencies
+```
+
+### Running Tests
+
+Run the full test suite:
+
+```powershell
+pytest -q
+```
+
+Run tests with coverage report:
+
+```powershell
+pytest --cov=core --cov=modules --cov=config --cov-report=html --cov-report=term-missing -q
+```
+
+Coverage report will be generated in `htmlcov/` (open `htmlcov/index.html` in a browser).
+
+### Code Quality Checks
+
+Check code style and linting:
+
+```powershell
+black --check .           # Check Black formatting
+isort --check-only .      # Check import sorting
+flake8 .                  # Lint with flake8
+```
+
+Auto-format and fix issues:
+
+```powershell
+black .                   # Auto-format with Black
+isort .                   # Auto-sort imports
+```
+
+### CI/CD Pipeline
+
+GitHub Actions automatically runs on every push and PR:
+
+1. **Lint stage**: Black, isort, flake8, mypy validation
+2. **Test stage**: Full pytest suite with coverage reporting (80%+ core target)
+3. **Smoke stage**: CLI import regression detection
+4. **Integration stage**: Optional API integration tests (gated by main branch + secrets)
+
+See `.github/workflows/` for workflow definitions.
+
+### Pre-commit Hooks
+
+Install pre-commit hooks to validate code before commits:
+
+```powershell
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+See `.pre-commit-config.yaml` for hook configuration.
+
+For more detailed contribution guidelines, see `CONTRIBUTING.md` and `CONTRIBUTING_MODULES.md`.
+
 
 API keys & .env
 ----------------

@@ -1,6 +1,6 @@
-import dns.resolver
-import pytest
 from pathlib import Path
+
+import dns.resolver
 
 from modules.subdomain_finder.scanner import SubdomainFinder
 

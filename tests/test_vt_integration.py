@@ -1,4 +1,5 @@
 import os
+
 import pytest
 
 from modules.subdomain_finder import api as api_helpers

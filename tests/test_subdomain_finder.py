@@ -1,7 +1,4 @@
 import dns.resolver
-import pytest
-from pathlib import Path
-from types import SimpleNamespace
 
 from modules.subdomain_finder.scanner import SubdomainFinder
 
@@ -35,4 +32,4 @@ def test_subdomain_finder_dns_and_verify(monkeypatch, tmp_path):
 
     assert results == ["www.example.com"]
     # ensure HEAD was attempted for the discovered host
-    assert any("www.example.com" in u for u in called["urls"]) 
+    assert any("www.example.com" in u for u in called["urls"])
