@@ -1,0 +1,10 @@
+{
+  "confidence": 1.0,
+  "last_updated": "2025-12-04T18:04:55.098964Z",
+  "modules": [
+    "pipeline",
+    "update_ips",
+    "whois"
+  ],
+  "first_seen": "2025-12-04T16:13:10.074642Z"
+}

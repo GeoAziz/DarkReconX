@@ -1,0 +1,19 @@
+{
+  "targets": {
+    "example.local": {
+      "success": true,
+      "providers": [
+        "stub-provider"
+      ],
+      "live_hosts": [
+        "https://10.0.0.42",
+        "http://10.0.0.42",
+        "https://example.local",
+        "http://example.local"
+      ],
+      "errors": {},
+      "scan_duration_seconds": 0.05
+    }
+  },
+  "total_targets": 1
+}

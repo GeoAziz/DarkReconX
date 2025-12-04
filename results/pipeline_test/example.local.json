@@ -1,0 +1,37 @@
+{
+  "merged": {
+    "success": true,
+    "providers": [
+      "stub-provider"
+    ],
+    "data": {
+      "some": "value",
+      "target": "example.local",
+      "resolved": {
+        "ip": [
+          "10.0.0.42"
+        ]
+      }
+    },
+    "errors": {},
+    "scan_duration_seconds": 0.05
+  },
+  "http_verify": [
+    {
+      "url": "https://10.0.0.42",
+      "live": true
+    },
+    {
+      "url": "http://10.0.0.42",
+      "live": true
+    },
+    {
+      "url": "https://example.local",
+      "live": true
+    },
+    {
+      "url": "http://example.local",
+      "live": true
+    }
+  ]
+}

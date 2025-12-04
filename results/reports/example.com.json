@@ -1,0 +1,6 @@
+{
+  "target": "example.com",
+  "risk": {
+    "score": 7
+  }
+}

@@ -1,0 +1,2 @@
+target,success,live_hosts_count,providers_count,errors_count,scan_duration_seconds
+example.local,True,4,1,0,0.05

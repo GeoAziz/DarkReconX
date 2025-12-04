@@ -1,0 +1,9 @@
+# ASR Summary Report
+
+Generated: {{ summary.generated_at }}
+
+Total findings: {{ summary.count }}
+
+Top risks:
+{% for r, c in summary.top_risks %}- {{ r }}: {{ c }}
+{% endfor %}

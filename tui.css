@@ -1,0 +1,145 @@
+/* DarkReconX TUI Styling - Dark Theme */
+
+Screen {
+    background: var(--surface);
+}
+
+#topbar {
+    background: var(--boost);
+    color: var(--text);
+    padding: 0 2;
+    height: 1;
+    text-style: bold;
+    dock: top;
+}
+
+#left-pane {
+    width: 35%;
+    padding: 0 1;
+    border-right: vpiece var(--panel);
+}
+
+#right-pane {
+    width: 65%;
+    padding: 0 2;
+}
+
+/* Section Titles */
+#modules-title,
+#profiles-title,
+#target-title,
+#results-title,
+#progress-title {
+    padding: 1 0;
+    text-style: bold;
+    color: var(--accent);
+    text-align: left;
+}
+
+/* Containers */
+#modules-list {
+    padding: 0 0 1 0;
+    height: 6;
+    border: round var(--panel);
+}
+
+#results-view {
+    background: var(--panel);
+    border: round var(--primary);
+    padding: 0 0 1 0;
+    height: 8;
+}
+
+/* Progress bar */
+#progress-bar {
+    height: 1;
+    margin: 0 0 1 0;
+}
+
+ProgressBar {
+    height: 1;
+}
+
+ProgressBar>.bar {
+    background: var(--success);
+}
+
+ProgressBar:focus>.bar {
+    background: var(--accent);
+}
+
+/* Buttons and Inputs */
+Button {
+    background: var(--accent);
+    color: var(--text);
+    padding: 0 2;
+    margin: 1 0 0 0;
+    text-style: bold;
+    border: heavy var(--accent);
+}
+
+Button:hover {
+    background: var(--primary);
+    border: heavy var(--primary);
+}
+
+Button:focus {
+    background: var(--boost);
+    border: heavy var(--boost);
+}
+
+Input {
+    border: tall var(--panel);
+    padding: 0 1;
+    margin: 0 0 1 0;
+    background: var(--panel);
+    color: var(--text);
+}
+
+Input:focus {
+    border: tall var(--accent);
+    background: var(--surface);
+}
+
+/* Selects and Lists */
+Select {
+    margin: 0 0 1 0;
+}
+
+/* Logs */
+#logs-title {
+    margin: 1 0 0 0;
+}
+
+TextLog {
+    height: 8;
+    border: round var(--panel);
+    padding: 0 1;
+}
+
+/* Status indicators */
+.status-ok {
+    color: var(--success);
+    text-style: bold;
+}
+
+.status-error {
+    color: var(--error);
+    text-style: bold;
+}
+
+.status-warn {
+    color: var(--warning);
+    text-style: bold;
+}
+
+/* Result entries */
+.result-entry {
+    padding: 1 1;
+    margin: 0 0 1 0;
+    border: round var(--panel);
+}
+
+.pretty {
+    padding: 1 1;
+}

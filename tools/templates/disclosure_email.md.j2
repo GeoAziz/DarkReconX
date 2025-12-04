@@ -1,0 +1,20 @@
+Subject: Security findings for {{ target }}
+
+Hello,
+
+This message contains a responsible disclosure prepared by {{ reporter }} (contact: {{ contact }}) regarding assets under your control.
+
+Date: {{ date }}
+
+Executive summary:
+
+The assessment identified {{ findings|length }} potential findings. A safe, non-exploitative description of each finding follows.
+
+{% for f in findings %}
+- Title: {{ f.title }}
+  Description: {{ f.description }}
+  Risk: {{ f.risk }}
+  Remediation: {{ f.remediation }}
+{% endfor %}
+
+Please contact {{ reporter }} to coordinate remediation and follow-up.

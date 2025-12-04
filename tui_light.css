@@ -1,0 +1,193 @@
+/* DarkReconX TUI Light Theme - CSS-compatible variant */
+
+Screen {
+  background: var(--text);
+}
+
+#topbar {
+  background: var(--panel);
+  color: var(--text);
+  padding: 0 8px;
+  height: 1.5rem;
+  font-weight: bold;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  border: 2px solid var(--panel);
+}
+
+#left-pane {
+  width: 35%;
+  padding: 0 8px;
+  border-right: 2px solid var(--panel);
+}
+
+#right-pane {
+  width: 65%;
+  padding: 0 8px;
+}
+
+/* Section Titles */
+#modules-title,
+#profiles-title,
+#target-title,
+#results-title,
+#progress-title {
+  padding: 1rem 0;
+  font-weight: bold;
+  color: var(--primary);
+  text-align: left;
+}
+
+/* Containers */
+#modules-list {
+  padding: 0 0 8px 0;
+  height: 6rem;
+  border-radius: 8px;
+  border: 1px solid var(--panel);
+  background: var(--surface);
+}
+
+#results-view {
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--panel);
+  padding: 0 0 8px 0;
+  height: 8rem;
+}
+
+#errors-view {
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--error);
+  padding: 0 0 8px 0;
+  height: 4rem;
+  display: none;
+}
+
+/* Progress bar */
+#progress-bar {
+  height: 1rem;
+  margin: 0 0 8px 0;
+}
+
+ProgressBar {
+  height: 1rem;
+}
+
+ProgressBar>.bar {
+  background: var(--accent);
+}
+
+ProgressBar:focus>.bar {
+  background: var(--primary);
+}
+
+/* Buttons and Inputs */
+Button {
+  background: var(--primary);
+  color: var(--text);
+  padding: 0 8px;
+  margin: 1rem 0 0 0;
+  font-weight: bold;
+  border: 2px solid var(--primary);
+}
+
+Button:hover {
+  background: var(--accent);
+  border: 2px solid var(--accent);
+}
+
+Button:focus {
+  background: var(--boost);
+  border: 2px solid var(--boost);
+}
+
+Input {
+  border: 3px solid var(--panel);
+  padding: 0 8px;
+  margin: 0 0 8px 0;
+  background: var(--surface);
+  color: var(--text);
+}
+
+Input:focus {
+  border: 3px solid var(--primary);
+  background: white;
+}
+
+/* Selects */
+Select {
+  margin: 0 0 8px 0;
+  background: var(--surface);
+}
+
+/* Logs and Status */
+#logs-title {
+  margin: 1rem 0 0 0;
+}
+
+TextLog {
+  height: 8rem;
+  border-radius: 8px;
+  border: 1px solid var(--panel);
+  padding: 0 8px;
+  background: var(--surface);
+}
+
+#status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1.5rem;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0 8px;
+  border-top: 2px solid var(--panel);
+  text-align: right;
+}
+
+/* Status indicators */
+.status-ok {
+  color: var(--success);
+  font-weight: bold;
+}
+
+.status-error {
+  color: var(--error);
+  font-weight: bold;
+}
+
+.status-warn {
+  color: var(--warning);
+  font-weight: bold;
+}
+
+/* Result entries */
+.result-entry {
+  padding: 1rem 1rem;
+  margin: 0 0 8px 0;
+  border-radius: 8px;
+  border: 1px solid var(--panel);
+  background: var(--surface);
+}
+
+.pretty {
+  padding: 1rem 1rem;
+}
+
+#target-feedback {
+  padding: 0 0 8px 0;
+}
+
+#profile-desc {
+  padding: 0 0 8px 0;
+  color: var(--accent);
+}
+
+#progress-label {
+  padding: 0 0 8px 0;
+  text-align: right;
+}

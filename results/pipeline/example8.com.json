@@ -1,0 +1,13 @@
+{
+  "merged": {
+    "target": "example8.com",
+    "providers": [],
+    "success": true,
+    "data": {},
+    "errors": {},
+    "cached_flags": {},
+    "scan_duration_seconds": 3.123283386230469e-05,
+    "profile": "full"
+  },
+  "http_verify": []
+}

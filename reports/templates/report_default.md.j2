@@ -1,0 +1,28 @@
+# Report for {{ target }}
+
+Generated: {{ generated_at }}
+
+## Summary
+
+{% if data is string %}
+- Target: {{ target }}
+- Risk Score: {{ data }}
+{% elif data is mapping %}
+- Target: {{ data.get('target', target) }}
+- Scan Time: {{ data.get('scan_time', 'N/A') }}
+- Risk Score: {{ data.get('risk', {}).get('score', 'N/A') }}
+- Reasons: {{ data.get('risk', {}).get('reasons', [])|join(', ') }}
+- Assets: {{ data.get('assets', [])|join(', ') }}
+{% elif data is iterable %}
+- Total services: {{ data|length }}
+{% endif %}
+
+## Data
+
+{% if data is mapping %}
+{{ data|tojson(indent=2) }}
+{% elif data is string %}
+{{ data }}
+{% else %}
+[Data: {{ data }}]
+{% endif %}

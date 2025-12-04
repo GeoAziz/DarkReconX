@@ -1,0 +1,13 @@
+{
+  "merged": {
+    "target": "192.168.1.6",
+    "providers": [],
+    "success": true,
+    "data": {},
+    "errors": {},
+    "cached_flags": {},
+    "scan_duration_seconds": 2.7418136596679688e-05,
+    "profile": "full"
+  },
+  "http_verify": []
+}
