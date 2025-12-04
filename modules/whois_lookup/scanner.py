@@ -5,7 +5,7 @@ import whois as _pywhois
 
 from core.logger import get_logger
 from core.module import BaseModule
-from core.output import print_json, save_output
+from core.output import print_json, save_output, standard_response
 
 logger = get_logger("whois_lookup")
 
@@ -37,7 +37,7 @@ class WhoisModule(BaseModule):
             else:
                 p = Path(__file__).resolve().parents[2] / "results" / f"whois_{domain}.json"
             save_output(str(p), result)
-            return result
+            return standard_response("whois_lookup", data=result)
         except Exception as e:
             logger.error(f"WHOIS lookup failed for {domain}: {e}")
-            return None
+            return standard_response("whois_lookup", error=str(e))

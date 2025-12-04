@@ -1,18 +1,19 @@
+# --- DAY 12: ATTACK SURFACE RECON CLI ---
 import importlib
 import inspect
-import sys
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Optional
 
 import pyfiglet
 import typer
 import yaml
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.json import JSON
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 # Ensure project root is on sys.path so `import config` and other top-level
 # packages work when running this file directly (python cli/main.py).
@@ -26,6 +27,173 @@ app = typer.Typer(invoke_without_command=True)
 
 def _modules_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "modules"
+
+
+@app.command("asr")
+def asr(
+    targets: str = typer.Option(..., "--targets", help="File with targets (domains, IPs, subdomains)"),
+    max_workers: int = typer.Option(50, "--max-workers", help="Max async workers/concurrency"),
+    ports: Optional[str] = typer.Option(None, "--ports", help="Port range, e.g. 1-1000"),
+    top_ports: Optional[int] = typer.Option(100, "--top-ports", help="Use top N ports (default 100)"),
+    safe_mode: bool = typer.Option(True, "--safe-mode/--no-safe-mode", help="Safe mode: HEAD only, no admin scan"),
+    tls_check: bool = typer.Option(True, "--tls-check/--no-tls-check", help="Enable SSL/TLS inspection"),
+    no_banner: bool = typer.Option(False, "--no-banner", help="Disable banner grabbing"),
+    out_format: str = typer.Option("json", "--format", help="Output format: json|csv"),
+    output: Optional[str] = typer.Option(None, "--output", help="Output file (default: results/asr_summary.json)"),
+):
+    """
+    Attack Surface Recon (ASR) Mapper: async, modular, safe asset mapping.
+    """
+    import asyncio
+    import csv
+    import os
+
+    from engine.asr_pipeline import run_asr
+
+    # Load targets
+    with open(targets) as f:
+        target_list = [line.strip() for line in f if line.strip()]
+    # Port selection
+    if ports:
+        if "-" in ports:
+            start, end = map(int, ports.split("-"))
+            port_list = list(range(start, end + 1))
+        else:
+            port_list = [int(p) for p in ports.split(",") if p.strip().isdigit()]
+    else:
+        # Top ports (conservative default)
+        # Example: top 100 TCP ports
+        port_list = [
+            80,
+            443,
+            22,
+            21,
+            25,
+            8080,
+            3306,
+            53,
+            110,
+            995,
+            143,
+            993,
+            465,
+            587,
+            8443,
+            23,
+            3389,
+            139,
+            445,
+            1723,
+            111,
+            5900,
+            1025,
+            8888,
+            8000,
+            8008,
+            53,
+            554,
+            179,
+            389,
+            636,
+            1521,
+            5432,
+            49152,
+            49153,
+            49154,
+            49155,
+            49156,
+            49157,
+            49158,
+            49159,
+            49160,
+            49161,
+            49162,
+            49163,
+            49164,
+            49165,
+            49166,
+            49167,
+            49168,
+            49169,
+            49170,
+            49171,
+            49172,
+            49173,
+            49174,
+            49175,
+            49176,
+            49177,
+            49178,
+            49179,
+            49180,
+            49181,
+            49182,
+            49183,
+            49184,
+            49185,
+            49186,
+            49187,
+            49188,
+            49189,
+            49190,
+            49191,
+            49192,
+            49193,
+            49194,
+            49195,
+            49196,
+            49197,
+            49198,
+            49199,
+            49200,
+            49201,
+            49202,
+            49203,
+            49204,
+            49205,
+            49206,
+            49207,
+            49208,
+            49209,
+            49210,
+            49211,
+            49212,
+            49213,
+            49214,
+            49215,
+        ][:top_ports]
+
+    # Run async ASR pipeline
+    results = asyncio.run(
+        run_asr(
+            target_list, port_list, safe_mode=safe_mode, tls_check=tls_check, banner=not no_banner, concurrency=max_workers
+        )
+    )
+
+    # Output
+    if not output:
+        output = "results/asr_summary.json"
+    os.makedirs(os.path.dirname(output), exist_ok=True)
+    if out_format == "json":
+        with open(output, "w") as f:
+            import json
+
+            json.dump(results, f, indent=2)
+        console.print(f"[green]ASR results saved to {output}[/green]")
+    elif out_format == "csv":
+        # Flatten and write CSV
+        keys = ["target", "ip", "port", "protocol", "service", "banner", "risk", "remediation"]
+        with open(output, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=keys)
+            writer.writeheader()
+            for r in results:
+                row = {k: r.get(k, "") for k in keys}
+                row["risk"] = ",".join(r.get("risk", {}).get("reasons", []))
+                row["remediation"] = ",".join(r.get("remediation", []))
+                writer.writerow(row)
+        console.print(f"[green]ASR CSV results saved to {output}[/green]")
+    else:
+        console.print(f"[red]Unknown output format: {out_format}[/red]")
 
 
 def _read_config() -> dict:
@@ -42,7 +210,7 @@ def _read_config() -> dict:
 def _format_output(data: dict, format_type: str = "pretty") -> None:
     """
     Format and display UnifiedRecord output.
-    
+
     Args:
         data: UnifiedRecord data as dictionary
         format_type: Output format - "json", "pretty", or "min"
@@ -50,49 +218,49 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
     if format_type == "json":
         # Raw JSON output
         console.print(json.dumps(data, indent=2))
-    
+
     elif format_type == "min":
         # Minimal output - just key facts
         console.print(f"Target: {data.get('target', 'N/A')}")
         console.print(f"Type: {data.get('type', 'N/A')}")
-        
+
         # Show resolved IPs if available
         resolved = data.get("resolved", {})
         if resolved.get("ip"):
             console.print(f"IPs: {', '.join(resolved['ip'][:3])}")
-        
+
         # Show risk if available
         risk = data.get("risk", {})
         if risk.get("malicious"):
             console.print(f"[bold red]⚠️  MALICIOUS (Score: {risk.get('score', 'N/A')})[/bold red]")
-        
+
         # Show network location if available
         network = data.get("network", {})
         if network.get("country"):
             location = f"{network.get('city', '')}, {network.get('country', '')}".strip(", ")
             console.print(f"Location: {location}")
-    
+
     elif format_type == "pretty":
         # Rich formatted output using tables and panels
-        
+
         # Header panel
         target = data.get("target", "Unknown")
         target_type = data.get("type", "Unknown")
         source = data.get("source", "Unknown")
-        
+
         header = f"[bold cyan]Target:[/bold cyan] {target}\n"
         header += f"[bold cyan]Type:[/bold cyan] {target_type}\n"
         header += f"[bold cyan]Source:[/bold cyan] {source}"
-        
+
         console.print(Panel(header, title="[bold yellow]Target Information[/bold yellow]", box=box.ROUNDED))
-        
+
         # DNS Resolution table
         resolved = data.get("resolved", {})
         if any(resolved.values()):
             dns_table = Table(title="DNS Resolution", box=box.SIMPLE)
             dns_table.add_column("Record Type", style="cyan")
             dns_table.add_column("Values", style="white")
-            
+
             if resolved.get("ip"):
                 dns_table.add_row("A / AAAA", "\n".join(resolved["ip"]))
             if resolved.get("mx"):
@@ -101,16 +269,16 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
                 dns_table.add_row("NS", "\n".join(resolved["ns"]))
             if resolved.get("txt"):
                 dns_table.add_row("TXT", "\n".join(resolved["txt"][:3]))  # Limit TXT records
-            
+
             console.print(dns_table)
-        
+
         # WHOIS Information table
         whois = data.get("whois", {})
         if any(v for v in whois.values() if v):
             whois_table = Table(title="WHOIS Information", box=box.SIMPLE)
             whois_table.add_column("Field", style="cyan")
             whois_table.add_column("Value", style="white")
-            
+
             if whois.get("registrar"):
                 whois_table.add_row("Registrar", whois["registrar"])
             if whois.get("org"):
@@ -125,16 +293,16 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
                 whois_table.add_row("Updated", whois["updated"])
             if whois.get("expires"):
                 whois_table.add_row("Expires", whois["expires"])
-            
+
             console.print(whois_table)
-        
+
         # Network Information table
         network = data.get("network", {})
         if any(network.values()):
             net_table = Table(title="Network Information", box=box.SIMPLE)
             net_table.add_column("Field", style="cyan")
             net_table.add_column("Value", style="white")
-            
+
             if network.get("asn"):
                 net_table.add_row("ASN", network["asn"])
             if network.get("asn_name"):
@@ -147,42 +315,59 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
                 net_table.add_row("Region", network["region"])
             if network.get("country"):
                 net_table.add_row("Country", network["country"])
-            
+
             console.print(net_table)
-        
+
         # Risk Assessment panel
         risk = data.get("risk", {})
         if risk.get("score") is not None or risk.get("malicious") or risk.get("categories"):
             risk_content = ""
-            
+
             if risk.get("malicious"):
                 risk_content += "[bold red]⚠️  MALICIOUS DETECTED[/bold red]\n"
             else:
                 risk_content += "[bold green]✓ No malicious activity detected[/bold green]\n"
-            
+
             if risk.get("score") is not None:
                 score = risk["score"]
                 score_color = "red" if score > 50 else "yellow" if score > 20 else "green"
                 risk_content += f"\n[{score_color}]Risk Score: {score}/100[/{score_color}]"
-            
+
             if risk.get("categories"):
                 risk_content += f"\n\nCategories: {', '.join(risk['categories'])}"
-            
+
             console.print(Panel(risk_content, title="[bold yellow]Risk Assessment[/bold yellow]", box=box.ROUNDED))
-    
+
     else:
         console.print(f"[red]Unknown format: {format_type}[/red]")
 
 
 @app.callback(invoke_without_command=True)
 def main(
-    ctx: typer.Context,
     tor: Optional[bool] = typer.Option(None, "--tor/--no-tor", help="Enable or disable Tor routing (overrides config)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose exception output"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Reduce console output"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Skip cache reads and writes"),
+    refresh_cache: bool = typer.Option(False, "--refresh-cache", help="Force refresh and update cache"),
 ):
+    # Acquire click/typer Context at runtime to avoid Typer introspection issues
+    import click
+
+    click_ctx = click.get_current_context(silent=True)
+    if click_ctx is None:
+        class _DummyCtx:
+            def __init__(self):
+                # provide obj attribute to match click.Context interface used by the app
+                self.obj = {}
+
+        click_ctx = _DummyCtx()
+
+    ctx = click_ctx
     banner = pyfiglet.figlet_format("DarkReconX")
-    console.print(f"[bold red]{banner}[/bold red]")
-    console.print("[bold yellow]Dark Web OSINT Recon Framework[/bold yellow]\n")
+    # Respect quiet mode
+    if not quiet:
+        console.print(f"[bold red]{banner}[/bold red]")
+        console.print("[bold yellow]Dark Web OSINT Recon Framework[/bold yellow]\n")
 
     # Determine Tor default: CLI flag overrides config/default.yml
     from config.loader import get_config
@@ -198,6 +383,14 @@ def main(
     ctx.obj = ctx.obj or {}
     ctx.obj["use_tor"] = use_tor
     ctx.obj["verbose"] = bool(verbose)
+    ctx.obj["quiet"] = bool(quiet)
+    # cache flags exposed to modules
+    ctx.obj["no_cache"] = bool(no_cache)
+    ctx.obj["refresh_cache"] = bool(refresh_cache)
+
+    # export environment variables so provider modules can opt-in to read them
+    os.environ["DARKRECONX_NO_CACHE"] = "1" if no_cache else "0"
+    os.environ["DARKRECONX_REFRESH_CACHE"] = "1" if refresh_cache else "0"
 
 
 @app.command("list")
@@ -219,6 +412,26 @@ def list_modules():
         console.print("[bold cyan]Available modules:[/bold cyan]")
         for m in sorted(modules):
             console.print(f" - {m}")
+
+
+@app.command("profiles")
+def profiles():
+    """List available scan profiles (presets)."""
+    try:
+        from core.profiles import load_profiles
+
+        profiles = load_profiles()
+        if not profiles:
+            console.print("[yellow]No profiles found (check config/profiles.yml or profiles.yaml)[/yellow]")
+            return
+
+        console.print("[bold cyan]Available profiles:[/bold cyan]")
+        for name, cfg in profiles.items():
+            # Show a one-line summary if available
+            summary = cfg.get("description", "") if isinstance(cfg, dict) else ""
+            console.print(f" - [bold]{name}[/bold] {(' - ' + summary) if summary else ''}")
+    except Exception as e:
+        console.print(f"[red]Failed to load profiles: {e}[/red]")
 
 
 def _find_callable(obj):
@@ -251,7 +464,7 @@ def _find_callable(obj):
 
 
 @app.command("run")
-def run_module(module: str, target: Optional[str] = None, ctx: typer.Context = None):
+def run_module(module: str, target: Optional[str] = None, ctx=None):
     """Run a module's stub. Example: `run dark_market_scanner --target item123`"""
     mod_name = module.strip()
     module_path = f"modules.{mod_name}.scanner"
@@ -267,8 +480,9 @@ def run_module(module: str, target: Optional[str] = None, ctx: typer.Context = N
     instance = None
     # figure out whether Tor and verbose were requested in the global context
     # support receiving the Typer context (injected by Typer when present)
-    use_tor = bool((ctx.obj or {}).get("use_tor", False)) if ctx is not None else False
-    verbose_flag = bool((ctx.obj or {}).get("verbose", False)) if ctx is not None else False
+    ctx_obj = getattr(ctx, "obj", {}) or {}
+    use_tor = bool(ctx_obj.get("use_tor", False))
+    verbose_flag = bool(ctx_obj.get("verbose", False))
 
     if callable_obj is None:
         # look for a class defined in this module and instantiate it
@@ -324,18 +538,38 @@ def run_module(module: str, target: Optional[str] = None, ctx: typer.Context = N
             if any(p.name != "use_tor" for p in params):
                 pos_args.append(target)
             result = callable_obj(*pos_args, **call_kwargs)
-        console.print(f"[green]Module {module} executed. Result: {result}[/green]")
+
+        # Normalize result with standardized response shape
+        try:
+            from core.output import standard_response, print_json
+
+            resp = standard_response(module, data=result)
+            # prefer pretty JSON display
+            print_json(resp, pretty=True)
+        except Exception:
+            console.print(f"[green]Module {module} executed. Result: {result}[/green]")
     except NotImplementedError as e:
         console.print(f"[yellow]Module {module} is a placeholder: {e}[/yellow]")
     except Exception as e:
-        console.print(f"[red]Error running module {module}: {e}[/red]")
+        try:
+            from core.output import standard_response, print_json
+
+            resp = standard_response(module, error=str(e))
+            print_json(resp, pretty=True)
+        except Exception:
+            console.print(f"[red]Error running module {module}: {e}[/red]")
 
 
 @app.command("whois")
-def whois(domain: str, tor: Optional[bool] = None, output: Optional[str] = None, ctx: typer.Context = None):
+def whois(domain: str, tor: Optional[bool] = None, output: Optional[str] = None, ctx=None):
     """WHOIS Lookup Tool"""
     # resolve use_tor from global context if CLI flag not provided
-    global_use_tor = bool((ctx.obj or {}).get("use_tor", False)) if ctx is not None else False
+    if ctx is None:
+        global_use_tor = False
+    else:
+        # use getattr to safely access 'obj' on an unknown ctx type
+        ctx_obj = getattr(ctx, "obj", {}) or {}
+        global_use_tor = bool(ctx_obj.get("use_tor", False))
     use_tor = global_use_tor if tor is None else bool(tor)
 
     try:
@@ -348,125 +582,75 @@ def whois(domain: str, tor: Optional[bool] = None, output: Optional[str] = None,
     mod.run(domain, use_tor=use_tor, output=output)
 
 
+# --- DAY 11 SUBDOMAIN ENUM ENGINE CLI ---
 @app.command("subfinder")
 def subfinder(
-    domain: str,
-    wordlist: Optional[str] = None,
-    tor: Optional[bool] = None,
-    workers: Optional[int] = typer.Option(None, "--workers", help="Override number of concurrent workers"),
-    verify_http: bool = typer.Option(
-        False, "--verify-http", help="Perform HEAD requests to discovered subdomains (respects --tor)"
+    domain: str = typer.Argument(..., help="Target domain for subdomain enumeration"),
+    wordlist: Optional[str] = typer.Option(None, "--wordlist", "-w", help="Wordlist for brute-force (SecLists)"),
+    subs: bool = typer.Option(False, "--subs", help="Passive subdomain enumeration only"),
+    subs_only: bool = typer.Option(False, "--subs-only", help="Passive only, skip active/perms/validation"),
+    bruteforce: bool = typer.Option(False, "--bruteforce", help="Active brute-force only"),
+    perms: bool = typer.Option(False, "--perms", help="Permutation engine only"),
+    full_subenum: bool = typer.Option(
+        False, "--full-subenum", help="Full subdomain enumeration (passive + active + perms + validation)"
     ),
-    verify_timeout: int = typer.Option(10, "--verify-timeout", help="Timeout (seconds) for HEAD verification"),
-    verify_retries: int = typer.Option(2, "--verify-retries", help="Number of retries for HEAD verification"),
-    verify_backoff: float = typer.Option(0.5, "--verify-backoff", help="Base backoff (seconds) for HEAD verification"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output path under results/ (file)"),
-    out_format: str = typer.Option("txt", "--format", "-f", help="Output format: txt|json|csv"),
-    api: Optional[str] = typer.Option(None, "--api", help="Optional online API to enrich results (securitytrails|virustotal)"),
-    api_key: Optional[str] = typer.Option(None, "--api-key", help="API key for selected API (optional)"),
-    no_cache: bool = typer.Option(False, "--no-cache", help="Bypass API cache for enrichment"),
-    async_mode: bool = typer.Option(False, "--async", help="Use async resolver prototype (requires dnspython>=2)"),
-    refresh_cache: bool = typer.Option(False, "--refresh-cache", help="Force re-fetch and update cache for enrichment"),
-    ctx: typer.Context = None,
+    vt_api_key: Optional[str] = typer.Option(None, "--vt-api-key", help="VirusTotal API key for passive enum"),
+    concurrency: int = typer.Option(200, "--concurrency", help="Max async DNS concurrency"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output path (JSON)"),
 ):
-    """Run the Subdomain Finder module.
-
-    Example: python cli/main.py subfinder example.com --tor
     """
-    # resolve global use_tor (CLI flag overrides global setting if provided)
-    # resolve global use_tor (CLI flag overrides global setting if provided)
-    global_use_tor = bool((ctx.obj or {}).get("use_tor", False)) if ctx is not None else False
-    use_tor = global_use_tor if tor is None else bool(tor)
+    Hybrid Subdomain Enumeration Engine (Passive, Active, Permutations, Validation)
+    """
+    import asyncio
+    import os
 
-    try:
-        from modules.subdomain_finder.scanner import SubdomainFinder
-    except Exception as e:
-        console.print(f"[red]Failed to import SubdomainFinder: {e}[/red]")
-        raise typer.Exit(1)
+    from modules.subdomains.engine import subdomain_enum
 
-    # choose async vs sync finder
-    if async_mode:
-        try:
-            from modules.subdomain_finder.async_scanner import AsyncSubdomainFinder
-        except Exception as e:
-            console.print(f"[red]Async mode unavailable: {e}[/red]")
-            raise typer.Exit(2)
-        finder = AsyncSubdomainFinder(
-            domain,
-            wordlist=wordlist,
-            concurrency=(workers or 100),
-            verbose=bool((ctx.obj or {}).get("verbose", False)) if ctx is not None else False,
-            verify_http=verify_http,
-            http_timeout=float(verify_timeout),
-        )
+    # Determine mode
+    if full_subenum:
+        mode = "full"
+    elif subs_only:
+        mode = "subs"
+    elif bruteforce:
+        mode = "bruteforce"
+    elif perms:
+        mode = "perms"
+    elif subs:
+        mode = "subs"
     else:
-        finder = SubdomainFinder(
-            domain,
-            wordlist=wordlist,
-            use_tor=use_tor,
-            workers=workers,
-            verify_http=verify_http,
-            verify_timeout=verify_timeout,
-            verify_retries=verify_retries,
-            verify_backoff=verify_backoff,
-            verbose=bool((ctx.obj or {}).get("verbose", False)) if ctx is not None else False,
-        )
-        # set API options if provided
-        if api:
-            try:
-                finder.set_api(api, api_key=api_key)
-                # set cache behavior: CLI flag overrides
-                if no_cache:
-                    finder.set_api_cache(False)
-                if refresh_cache:
-                    finder.set_api_refresh(True)
-                # env var API_CACHE_BYPASS will also be honored by helpers
-            except Exception:
-                console.print(
-                    f"[yellow]Warning: API {api} not available or failed to configure; continuing without API enrichment[/yellow]"
-                )
+        mode = "full"
 
-    # run and save outputs according to format
-    results = finder.run()
-    # ensure results/ exists at project root
-    from pathlib import Path
+    # Load wordlist if needed
+    wl = []
+    if wordlist and (mode in ("full", "bruteforce", "perms")):
+        if os.path.exists(wordlist):
+            with open(wordlist) as f:
+                wl = [line.strip() for line in f if line.strip()]
+        else:
+            console.print(f"[red]Wordlist not found: {wordlist}[/red]")
+            raise typer.Exit(1)
 
-    root = Path(__file__).resolve().parents[1]
-    results_dir = root / "results"
-    results_dir.mkdir(exist_ok=True)
+    # Run async engine
+    result = asyncio.run(
+        subdomain_enum(domain, wordlist=wl if wl else None, vt_api_key=vt_api_key, mode=mode, concurrency=concurrency)
+    )
 
+    # Output
     if output:
         out_path = Path(output)
         if not out_path.is_absolute():
-            out_path = results_dir / out_path
-    else:
-        out_path = results_dir / f"subfinder_{domain}.{out_format}"
-
-    # support formats
-    if out_format == "txt":
-        with out_path.open("w", encoding="utf-8") as fh:
-            for r in results:
-                # Ensure r is a string before concatenation
-                if isinstance(r, str):
-                    fh.write(r + "\n")
-                else:
-                    fh.write(str(r) + "\n")
-        console.print(f"[green]Saved results to {out_path}[/green]")
-    elif out_format == "json":
-        from core.output import save_output
-
-        save_output(str(out_path), results)
-    elif out_format == "csv":
-        import csv
-
-        with out_path.open("w", encoding="utf-8", newline="") as fh:
-            writer = csv.writer(fh)
-            writer.writerow(["subdomain"])
-            for r in results:
-                writer.writerow([r])
+            out_path = Path(__file__).resolve().parents[1] / "results" / "subdomains" / out_path
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2)
         console.print(f"[green]Saved results to {out_path}[/green]")
     else:
-        console.print(f"[red]Unsupported format: {out_format}[/red]")
+        console.print(f"[bold cyan]Subdomain enumeration complete for {domain}[/bold cyan]")
+        console.print(f"[yellow]Discovered {result['count']} subdomains[/yellow]")
+        for sub in result["subdomains"][:20]:
+            console.print(f" - {sub}")
+        if result["count"] > 20:
+            console.print(f"...and {result['count']-20} more. See results/subdomains/{domain}.json")
 
 
 @app.command("enrich")
@@ -477,105 +661,123 @@ def enrich(
     output_format: str = typer.Option("pretty", "--format", "-f", help="Output format: json, pretty, or min"),
     save: Optional[str] = typer.Option(None, "--save", "-s", help="Save output to file (JSON format)"),
     tor: Optional[bool] = None,
-    ctx: typer.Context = None,
+    ctx=None,
 ):
     """
     Enrich a target using multiple providers with unified output.
-    
+
     This command uses the Day 9 unification layer to combine data from
     multiple providers into a single, consistent format.
-    
+
     Examples:
         python cli/main.py enrich example.com --pretty
         python cli/main.py enrich 8.8.8.8 --type ip --format json
         python cli/main.py enrich example.com --providers dns,whois,virustotal
     """
-    # Resolve global use_tor
-    global_use_tor = bool((ctx.obj or {}).get("use_tor", False)) if ctx is not None else False
-    use_tor = global_use_tor if tor is None else bool(tor)
-    
     console.print(f"[cyan]Enriching target:[/cyan] {target}")
     console.print(f"[cyan]Type:[/cyan] {target_type}")
     console.print(f"[cyan]Providers:[/cyan] {providers}")
     console.print()
-    
+
     # Parse providers list
     provider_list = [p.strip() for p in providers.split(",")]
-    
+
     # Collect data from each provider
     providers_data = {}
-    
+
     with console.status("[bold green]Gathering data from providers...") as status:
         for provider in provider_list:
             try:
                 status.update(f"[bold green]Querying {provider}...")
-                
+
+                # Check for required API keys for some providers and skip safely
+                if provider in ("virustotal", "vt", "virus_total"):
+                    try:
+                        from core.keys import check_api_key
+
+                        present, msg = check_api_key("VT_API_KEY")
+                        if not present:
+                            console.print(f"[yellow]{msg}[/yellow]")
+                            continue
+                    except Exception:
+                        # best-effort: if keys helper fails, continue
+                        pass
+                if provider in ("ipinfo",):
+                    try:
+                        from core.keys import check_api_key
+
+                        present, msg = check_api_key("IPINFO_TOKEN")
+                        if not present:
+                            console.print(f"[yellow]{msg}[/yellow]")
+                            continue
+                    except Exception:
+                        pass
+
                 if provider == "dns":
                     # Query DNS
                     try:
                         import dns.resolver
+
                         resolver = dns.resolver.Resolver()
-                        
+
                         dns_data = {}
                         for record_type in ["A", "MX", "NS", "TXT"]:
                             try:
-                                    answers = resolver.resolve(target, record_type)
-                                    # answers is an Answer object, which is not directly iterable, but answers.rrset is RRset and is iterable
-                                    if hasattr(answers, "rrset") and answers.rrset:
-                                        rrset = answers.rrset
-                                        if record_type == "A":
-                                            dns_data["A"] = [rdata.to_text() for rdata in rrset]
-                                        elif record_type == "MX":
-                                            dns_data["MX"] = [rdata.to_text() for rdata in rrset]
-                                        elif record_type == "NS":
-                                            dns_data["NS"] = [rdata.to_text() for rdata in rrset]
-                                        elif record_type == "TXT":
-                                            # TXT records are bytes, decode if needed
-                                            txt_records = []
-                                            for rdata in rrset:
-                                                val = rdata.to_text()
-                                                if isinstance(val, bytes):
-                                                    val = val.decode(errors="ignore")
-                                                txt_records.append(val)
-                                            dns_data["TXT"] = txt_records
+                                answers = resolver.resolve(target, record_type)
+                                # answers is an Answer object, which is not directly iterable, but answers.rrset is RRset and is iterable
+                                if hasattr(answers, "rrset") and answers.rrset:
+                                    rrset = answers.rrset
+                                    if record_type == "A":
+                                        dns_data["A"] = [rdata.to_text() for rdata in rrset]
+                                    elif record_type == "MX":
+                                        dns_data["MX"] = [rdata.to_text() for rdata in rrset]
+                                    elif record_type == "NS":
+                                        dns_data["NS"] = [rdata.to_text() for rdata in rrset]
+                                    elif record_type == "TXT":
+                                        # TXT records are bytes, decode if needed
+                                        txt_records = []
+                                        for rdata in rrset:
+                                            val = rdata.to_text()
+                                            if isinstance(val, bytes):
+                                                val = val.decode(errors="ignore")
+                                            txt_records.append(val)
+                                        dns_data["TXT"] = txt_records
                             except Exception:
                                 pass
-                        
+
                         if dns_data:
                             providers_data["dns"] = dns_data
                     except Exception as e:
                         console.print(f"[yellow]DNS query failed: {e}[/yellow]")
-                
+
                 elif provider == "whois":
                     # Query WHOIS
                     try:
-                        from modules.whois_lookup.scanner import WhoisModule
-                        whois_mod = WhoisModule()
                         # This would need to be adapted to return data instead of printing
-                        console.print(f"[yellow]WHOIS integration pending - use whois command directly[/yellow]")
+                        console.print("[yellow]WHOIS integration pending - use whois command directly[/yellow]")
                     except Exception as e:
                         console.print(f"[yellow]WHOIS query failed: {e}[/yellow]")
-                
+
                 else:
                     console.print(f"[yellow]Provider '{provider}' not yet integrated[/yellow]")
-            
+
             except Exception as e:
                 console.print(f"[red]Error querying {provider}: {e}[/red]")
-    
+
     # Unify the data
     if not providers_data:
         console.print("[red]No data collected from providers[/red]")
         raise typer.Exit(1)
-    
+
     try:
         from core.unify import unify_provider_data
-        
+
         unified_record = unify_provider_data(target, target_type, providers_data)
         record_dict = unified_record.to_dict()
-        
+
         # Display output
         _format_output(record_dict, output_format)
-        
+
         # Save if requested
         if save:
             save_path = Path(save)
@@ -583,17 +785,61 @@ def enrich(
                 results_dir = Path(__file__).resolve().parents[1] / "results"
                 results_dir.mkdir(exist_ok=True)
                 save_path = results_dir / save
-            
+
             with save_path.open("w", encoding="utf-8") as f:
                 json.dump(record_dict, f, indent=2)
-            
+
             console.print(f"\n[green]Saved to: {save_path}[/green]")
-    
+
     except Exception as e:
         console.print(f"[red]Error unifying data: {e}[/red]")
         import traceback
+
         traceback.print_exc()
         raise typer.Exit(1)
+
+
+@app.command("pipeline")
+def pipeline(
+    targets: str = typer.Option(..., "--targets", "-t", help="Target file (one per line) or single target"),
+    profile: str = typer.Option("full", "--profile", help="Scan profile: fast, full, privacy"),
+    verify_http: bool = typer.Option(True, "--verify-http/--no-verify-http", help="Enable HTTP verification"),
+    outdir: Optional[str] = typer.Option(None, "--outdir", help="Output directory (default: results/pipeline)"),
+    ctx=None,
+):
+    """Run the full integrated pipeline for a set of targets.
+
+    The `targets` argument may be a path to a file with one target per line
+    or a single domain/IP string.
+    """
+    try:
+        from engine.pipeline import run_pipeline_cli
+    except Exception as e:
+        console.print(f"[red]Pipeline module not available: {e}[/red]")
+        raise typer.Exit(1)
+
+    # Collect flags propagated from global callback
+    if ctx is not None:
+        ctx_obj = getattr(ctx, "obj", {}) or {}
+    else:
+        ctx_obj = {}
+    no_cache = bool(ctx_obj.get("no_cache", False))
+    refresh_cache = bool(ctx_obj.get("refresh_cache", False))
+
+    kwargs = {
+        "profile": profile,
+        "verify_http": verify_http,
+    }
+    if outdir:
+        kwargs["outdir"] = outdir
+
+    # Export env for providers to pick up if needed
+    os.environ["DARKRECONX_NO_CACHE"] = "1" if no_cache else "0"
+    os.environ["DARKRECONX_REFRESH_CACHE"] = "1" if refresh_cache else "0"
+
+    console.print(f"[cyan]Starting pipeline for targets: {targets}[/cyan]")
+    run_pipeline_cli(targets, **kwargs)
+    console.print(f"[green]Pipeline completed. Summary written to {kwargs.get('outdir','results/pipeline')}[/green]")
 
 
 if __name__ == "__main__":
