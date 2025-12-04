@@ -582,6 +582,19 @@ def whois(domain: str, tor: Optional[bool] = None, output: Optional[str] = None,
     mod.run(domain, use_tor=use_tor, output=output)
 
 
+@app.command("tui")
+def tui():
+    """Launch the interactive Textual TUI dashboard (Day 22)."""
+    try:
+        # Import the local tui launcher
+        from tui import launch_tui
+
+        launch_tui()
+    except Exception as e:
+        console.print(f"[red]Failed to launch TUI: {e}[/red]")
+        console.print("Ensure `textual` is installed: pip install textual rich")
+
+
 # --- DAY 11 SUBDOMAIN ENUM ENGINE CLI ---
 @app.command("subfinder")
 def subfinder(
