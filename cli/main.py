@@ -15,6 +15,54 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+# Normalize repeated -v flags (e.g. -v, -vv) into a single --verbose N before Typer/Cli parses
+# This avoids Click/Typer incompatibilities with count/is_flag across versions.
+def _normalize_argv_verbosity():
+    argv = sys.argv[1:]
+    count = 0
+    explicit_verbose = False
+    new_args = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        # handle combined -vvv style
+        if a.startswith("-") and not a.startswith("--"):
+            # strip leading '-' and check if all v's
+            rest = a.lstrip("-")
+            if rest and all(ch == "v" for ch in rest):
+                count += len(rest)
+                i += 1
+                continue
+        if a == "--verbose":
+            explicit_verbose = True
+            # keep the flag and its possible value
+            new_args.append(a)
+            # if there's a following token and it doesn't start with '-', treat it as value
+            if i + 1 < len(argv) and not argv[i + 1].startswith("-"):
+                new_args.append(argv[i + 1])
+                i += 2
+                continue
+            i += 1
+            continue
+        # treat single -v as count too
+        if a == "-v":
+            count += 1
+            i += 1
+            continue
+
+        new_args.append(a)
+        i += 1
+
+    if count > 0:
+        # export to environment so Typer/Click don't need to parse repeated -v
+        os.environ.setdefault("DARKRECONX_VERBOSITY", str(count))
+        # rebuild argv without the -v/-vv tokens (keep any explicit --verbose)
+        sys.argv = [sys.argv[0]] + new_args
+
+
+# run normalization early (module import time)
+_normalize_argv_verbosity()
+
 # Ensure project root is on sys.path so `import config` and other top-level
 # packages work when running this file directly (python cli/main.py).
 _ROOT = Path(__file__).resolve().parents[1]
@@ -35,8 +83,8 @@ def asr(
     max_workers: int = typer.Option(50, "--max-workers", help="Max async workers/concurrency"),
     ports: Optional[str] = typer.Option(None, "--ports", help="Port range, e.g. 1-1000"),
     top_ports: Optional[int] = typer.Option(100, "--top-ports", help="Use top N ports (default 100)"),
-    safe_mode: bool = typer.Option(True, "--safe-mode/--no-safe-mode", help="Safe mode: HEAD only, no admin scan"),
-    tls_check: bool = typer.Option(True, "--tls-check/--no-tls-check", help="Enable SSL/TLS inspection"),
+    safe_mode: bool = typer.Option(True, "--safe-mode", "--no-safe-mode", help="Safe mode: HEAD only, no admin scan"),
+    tls_check: bool = typer.Option(True, "--tls-check", "--no-tls-check", help="Enable SSL/TLS inspection"),
     no_banner: bool = typer.Option(False, "--no-banner", help="Disable banner grabbing"),
     out_format: str = typer.Option("json", "--format", help="Output format: json|csv"),
     output: Optional[str] = typer.Option(None, "--output", help="Output file (default: results/asr_summary.json)"),
@@ -352,9 +400,9 @@ def _format_output(data: dict, format_type: str = "pretty", verbosity: int = 0) 
 
 @app.callback(invoke_without_command=True)
 def main(
-    tor: Optional[bool] = typer.Option(None, "--tor/--no-tor", help="Enable or disable Tor routing (overrides config)"),
+    tor: bool = typer.Option(False, "--tor", "--no-tor", help="Enable or disable Tor routing (overrides config)"),
     format: str = typer.Option("pretty", "--format", "-f", help="Output format: pretty|json|md"),
-    verbose: int = typer.Option(0, "--verbose", "-v", help="Increase verbosity (use -v or -vv)", count=True),
+    verbose: int = typer.Option(0, "--verbose", help="Increase verbosity (use -v or -vv)"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Reduce console output"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Skip cache reads and writes"),
     refresh_cache: bool = typer.Option(False, "--refresh-cache", help="Force refresh and update cache"),
@@ -390,8 +438,15 @@ def main(
 
     # store in context for subcommands to access
     ctx.obj = ctx.obj or {}
+    # combine verbosity from the CLI option and any -v repetitions normalized into
+    # the DARKRECONX_VERBOSITY environment variable (see top-level normalization)
+    env_verb = int(os.environ.get("DARKRECONX_VERBOSITY", "0"))
+    try:
+        cli_verb = int(verbose)
+    except Exception:
+        cli_verb = 0
     ctx.obj["use_tor"] = use_tor
-    ctx.obj["verbosity"] = int(verbose)
+    ctx.obj["verbosity"] = int(cli_verb or env_verb)
     ctx.obj["format"] = format
     ctx.obj["quiet"] = bool(quiet)
     # cache flags exposed to modules
@@ -571,7 +626,7 @@ def run_module(module: str, target: Optional[str] = None, ctx=None):
 
 
 @app.command("whois")
-def whois(domain: str, tor: Optional[bool] = None, output: Optional[str] = None, ctx=None):
+def whois(domain: str, tor: Optional[bool] = typer.Option(None, "--tor", "--no-tor", help="Enable or disable Tor routing (overrides config)"), output: Optional[str] = None, ctx=None):
     """WHOIS Lookup Tool"""
     # resolve use_tor from global context if CLI flag not provided
     if ctx is None:
@@ -937,7 +992,7 @@ def enrich(
     providers: str = typer.Option("dns,whois", "--providers", "-p", help="Comma-separated list of providers to query"),
     output_format: str = typer.Option("pretty", "--format", "-f", help="Output format: json, pretty, or min"),
     save: Optional[str] = typer.Option(None, "--save", "-s", help="Save output to file (JSON format)"),
-    tor: Optional[bool] = None,
+    tor: Optional[bool] = typer.Option(None, "--tor", "--no-tor", help="Enable or disable Tor routing (overrides config)"),
     ctx=None,
 ):
     """
@@ -1103,7 +1158,7 @@ def enrich(
 def pipeline(
     targets: str = typer.Option(..., "--targets", "-t", help="Target file (one per line) or single target"),
     profile: str = typer.Option("full", "--profile", help="Scan profile: fast, full, privacy"),
-    verify_http: bool = typer.Option(True, "--verify-http/--no-verify-http", help="Enable HTTP verification"),
+    verify_http: bool = typer.Option(True, "--verify-http", "--no-verify-http", help="Enable HTTP verification"),
     outdir: Optional[str] = typer.Option(None, "--outdir", help="Output directory (default: results/pipeline)"),
     ctx=None,
 ):
@@ -1143,4 +1198,66 @@ def pipeline(
 
 
 if __name__ == "__main__":
-    app()
+    try:
+        app()
+    except TypeError as e:
+        # Workaround for Typer/Rich/Click compatibility issues when
+        # formatting help text (some versions of click.Param.make_metavar
+        # have a different signature). Fall back to Click's plain help.
+        msg = str(e)
+        if "make_metavar" in msg or "Secondary flag is not valid" in msg:
+            # Typer/Rich/Click mismatch when formatting help; print a simple
+            # fallback help by scanning this file for @app.command usages.
+            try:
+                from pathlib import Path
+
+                this = Path(__file__)
+                src = this.read_text(encoding="utf-8")
+                lines = src.splitlines()
+
+                commands = []
+                i = 0
+                while i < len(lines):
+                    line = lines[i].strip()
+                    if line.startswith("@app.command"):
+                        # capture decorator argument if present
+                        name = None
+                        if "(" in line and ")" in line:
+                            inside = line[line.find("(") + 1 : line.rfind(")")].strip()
+                            if inside:
+                                # remove quotes
+                                name = inside.strip().strip('"').strip("'")
+                        # look ahead for def
+                        j = i + 1
+                        while j < len(lines) and not lines[j].strip().startswith("def "):
+                            j += 1
+                        if j < len(lines):
+                            def_line = lines[j].strip()
+                            # extract function name
+                            fn = def_line.split("def ", 1)[1].split("(", 1)[0].strip()
+                            cmd_name = name or fn
+                            # try to read one-line docstring
+                            doc = ""
+                            k = j + 1
+                            # skip possible decorators or blank lines
+                            while k < len(lines) and lines[k].strip() == "":
+                                k += 1
+                            if k < len(lines) and lines[k].strip().startswith('"""'):
+                                doc_line = lines[k].strip().lstrip('"""').strip()
+                                doc = doc_line.split('\n', 1)[0]
+                            commands.append((cmd_name, doc))
+                            i = j
+                    i += 1
+
+                # Print a simple help summary
+                print("\nUsage: python -m cli.main [OPTIONS] COMMAND [ARGS]...\n")
+                print("Commands:")
+                for name, doc in commands:
+                    display = name.ljust(20)
+                    summary = f" - {doc}" if doc else ""
+                    print(f"  {display}{summary}")
+            except Exception:
+                # if fallback fails, re-raise original
+                raise
+        else:
+            raise

@@ -12,7 +12,9 @@ def _missing_whois(domain: str):
 class _WhoisPlaceholder:
     whois = staticmethod(_missing_whois)
 
-_pywhois = _WhoisPlaceholder()
+# Start as None so we attempt a lazy import of a real whois implementation
+# at runtime; tests can still monkeypatch `_pywhois` if needed.
+_pywhois = None
 
 from core.logger import get_logger
 from core.module import BaseModule

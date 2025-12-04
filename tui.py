@@ -34,22 +34,33 @@ else:
         textual_app = import_module("textual.app")
         textual_widgets = import_module("textual.widgets")
         textual_containers = import_module("textual.containers")
-        App = getattr(textual_app, "App")
-        ComposeResult = getattr(textual_app, "ComposeResult")
-        Header = getattr(textual_widgets, "Header")
-        Footer = getattr(textual_widgets, "Footer")
-        Static = getattr(textual_widgets, "Static")
-        Button = getattr(textual_widgets, "Button")
-        Checkbox = getattr(textual_widgets, "Checkbox")
-        Input = getattr(textual_widgets, "Input")
-        Select = getattr(textual_widgets, "Select")
-        TextLog = getattr(textual_widgets, "TextLog")
-        ScrollView = getattr(textual_widgets, "ScrollView")
-        ProgressBar = getattr(textual_widgets, "ProgressBar")
-        Label = getattr(textual_widgets, "Label")
-        Horizontal = getattr(textual_containers, "Horizontal")
-        Vertical = getattr(textual_containers, "Vertical")
-    except Exception:
+        App = getattr(textual_app, "App", None)
+        ComposeResult = getattr(textual_app, "ComposeResult", None)
+        Header = getattr(textual_widgets, "Header", None)
+        Footer = getattr(textual_widgets, "Footer", None)
+        Static = getattr(textual_widgets, "Static", None)
+        Button = getattr(textual_widgets, "Button", None)
+        Checkbox = getattr(textual_widgets, "Checkbox", None)
+        Input = getattr(textual_widgets, "Input", None)
+        Select = getattr(textual_widgets, "Select", None)
+        TextLog = getattr(textual_widgets, "TextLog", None)
+        ScrollView = getattr(textual_widgets, "ScrollView", None)
+        ProgressBar = getattr(textual_widgets, "ProgressBar", None)
+        Label = getattr(textual_widgets, "Label", None)
+        Horizontal = getattr(textual_containers, "Horizontal", None)
+        Vertical = getattr(textual_containers, "Vertical", None)
+    except Exception as _exc:
+        # For debugging: print why the Textual imports failed during module import.
+        try:
+            import traceback, sys
+
+            traceback.print_exc()
+        except Exception:
+            pass
+        # Ensure these module references exist even when import fails to avoid NameError later
+        textual_app = None
+        textual_widgets = None
+        textual_containers = None
         App = None
         ComposeResult = None
         Header = Footer = Static = Button = Checkbox = Input = Select = TextLog = ScrollView = ProgressBar = Label = None
@@ -136,14 +147,16 @@ def _autocomplete_tlds(partial: str) -> List[str]:
         # User is typing TLD after domain
         return [tld for tld in COMMON_TLDS if tld.startswith(partial_lower.split('.')[-1])]
     return []
-
-
 if App is not None:
+    # Provide fallbacks for widget API differences across Textual releases
+    TextLog = TextLog or getattr(textual_widgets, "Log", None)
+    # If ScrollView is unavailable, fall back to Static as a simple scrollable container
+    ScrollView = ScrollView or getattr(textual_widgets, "ScrollView", None) or Static
+
+    # Assert only critical widgets are present; optional widgets may be None
     assert Static is not None
     assert Checkbox is not None
     assert Select is not None
-    assert TextLog is not None
-    assert ScrollView is not None
 
     class ModuleCheckbox(Checkbox):
         """Enhanced checkbox with module description."""
@@ -154,7 +167,10 @@ if App is not None:
 
 
     class TUIMainApp(App):
-        CSS_PATH = "tui.css"
+        # Avoid loading the provided CSS by default to prevent stylesheet
+        # parsing errors on different Textual versions. The TUI will still
+        # function with default terminal styling.
+        CSS_PATH = None
         BINDINGS = [
             ("q", "quit", "Quit"),
             ("r", "run_scan", "Run Scan"),
@@ -173,7 +189,8 @@ if App is not None:
             super().__init__(*args, **kwargs)
             self.view_mode = "json"  # json or table
             self.errors_list: List[Dict[str, Any]] = []
-            self.theme = self._load_theme_preference()
+            # store theme preference locally without setting App.theme (may be unregistered)
+            self._theme = self._load_theme_preference()
             self.scan_results: List[Dict[str, Any]] = []  # for export
 
         def _load_theme_preference(self) -> str:
@@ -181,10 +198,10 @@ if App is not None:
             try:
                 theme_file = Path.home() / ".darkreconx_theme"
                 if theme_file.exists():
-                    return theme_file.read_text().strip() or "dark"
+                        return theme_file.read_text().strip() or "light"
             except Exception:
                 pass
-            return "dark"
+            return "light"
 
         def _save_theme_preference(self, theme: str) -> None:
             """Save theme preference to file."""
@@ -201,7 +218,18 @@ if App is not None:
                     self.STYLESHEET = "tui_light.css"
                 else:
                     self.STYLESHEET = "tui.css"
-                self.recompose()
+                # Recompose may be a coroutine in some Textual versions; handle both cases
+                res = self.recompose()
+                if asyncio.iscoroutine(res):
+                    # Try to schedule on the running loop, otherwise run to completion
+                    try:
+                        asyncio.create_task(res)
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        try:
+                            loop.run_until_complete(res)
+                        finally:
+                            loop.close()
             except Exception:
                 pass
 
@@ -246,8 +274,47 @@ if App is not None:
                     self.errors_panel.visible = False
                     yield self.errors_panel
                     yield Static("[b]Logs[/b]", id="logs-title")
-                    self.log = TextLog(highlight=True, markup=True, id="logs-view")
-                    yield self.log
+                    # Create logs widget with compatibility across Textual versions.
+                    def _create_logs_widget():
+                        # Try TextLog or Log with common kwargs, falling back on simpler constructors.
+                        candidates = [TextLog, getattr(textual_widgets, "Log", None)]
+                        for cls in candidates:
+                            if cls is None:
+                                continue
+                            try:
+                                return cls(highlight=True, markup=True, id="logs-view")
+                            except TypeError:
+                                try:
+                                    return cls(highlight=True, id="logs-view")
+                                except TypeError:
+                                    try:
+                                        return cls(id="logs-view")
+                                    except Exception:
+                                        continue
+
+                        # Fallback: a Static-based simple logger with a write() method.
+                        class SimpleLog(Static):
+                            def __init__(self, *a, **k):
+                                # initialize with empty content
+                                super().__init__("", *a, **k)
+                                self._buffer = ""
+
+                            def write(self, text: str) -> None:
+                                try:
+                                    self._buffer += str(text) + "\n"
+                                    # update replaces content; keep it simple
+                                    self.update(self._buffer)
+                                except Exception:
+                                    pass
+
+                        try:
+                            return SimpleLog(id="logs-view")
+                        except Exception:
+                            # As a last resort, return a Static instance
+                            return Static("Logs unavailable", id="logs-view")
+
+                    self.logs_widget = _create_logs_widget()
+                    yield self.logs_widget
             # Status bar at bottom
             self.status_bar = Static("Ready", id="status-bar")
             yield self.status_bar
@@ -269,10 +336,20 @@ if App is not None:
             profile_opts = [(name, name) for name in profiles.keys()]
             if not profile_opts:
                 profile_opts = [("quick", "quick"), ("full", "full"), ("privacy", "privacy")]
-            self.profile_select.options = profile_opts
+            # Use setattr to avoid static type-checkers complaining about Select.options
+            setattr(self.profile_select, "options", profile_opts)
             if profile_opts:
-                self.profile_select.value = profile_opts[0][1]
-                self._update_profile_desc(profile_opts[0][1])
+                # Some Textual Select implementations validate assigned values strictly
+                # and may raise for plain strings. Try to assign, but don't fail if it
+                # raises — we'll still update the profile description for the UI.
+                try:
+                    self.profile_select.value = profile_opts[0][1]
+                except Exception:
+                    pass
+                try:
+                    self._update_profile_desc(profile_opts[0][1])
+                except Exception:
+                    pass
 
             # Initial results message
             try:
@@ -280,13 +357,15 @@ if App is not None:
             except Exception:
                 pass
 
-            # Focus target input
+            # Focus target input (handle both sync and async focus() across Textual versions)
             try:
-                await self.target_input.focus()
+                res = self.target_input.focus()
+                if asyncio.iscoroutine(res):
+                    await res
             except Exception:
                 pass
 
-            self.log.write("[green]TUI ready. Press R to scan or H for help.[/green]")
+            self.logs_widget.write("[green]TUI ready. Press R to scan or H for help.[/green]")
 
         async def on_input_changed(self, event) -> None:
             """Handle input changes for target field validation and module search."""
@@ -366,7 +445,7 @@ if App is not None:
 [b yellow]Theme:[/b yellow]
   Press Ctrl+T to toggle between Dark and Light themes (persists between sessions)
 """
-            self.log.write(help_text)
+            self.logs_widget.write(help_text)
 
         async def action_toggle_errors(self) -> None:
             """Toggle errors panel visibility."""
@@ -375,7 +454,7 @@ if App is not None:
                 self.errors_panel.visible = not visible
                 if not visible and not self.errors_list:
                     await self.errors_panel.mount(Static("No errors yet.", classes="pretty"))
-                self.log.write(f"[cyan]Errors panel {'shown' if not visible else 'hidden'}.[/cyan]")
+                self.logs_widget.write(f"[cyan]Errors panel {'shown' if not visible else 'hidden'}.[/cyan]")
             except Exception:
                 pass
 
@@ -385,17 +464,17 @@ if App is not None:
             try:
                 mode_text = "Table" if self.view_mode == "table" else "JSON"
                 self.view_indicator.update(f"[b]Results[/b] ({mode_text})")
-                self.log.write(f"[cyan]Switched to {mode_text} view.[/cyan]")
+                self.logs_widget.write(f"[cyan]Switched to {mode_text} view.[/cyan]")
             except Exception:
                 pass
 
         async def action_toggle_theme(self) -> None:
             """Toggle between Dark and Light themes (Ctrl+T)."""
-            new_theme = "light" if self.theme == "dark" else "dark"
-            self.theme = new_theme
+            new_theme = "light" if self._theme == "dark" else "dark"
+            self._theme = new_theme
             self._save_theme_preference(new_theme)
             self._reload_css(new_theme)
-            self.log.write(f"[cyan]Switched to {new_theme.upper()} theme. Restart TUI to fully apply.[/cyan]")
+            self.logs_widget.write(f"[cyan]Switched to {new_theme.upper()} theme. Restart TUI to fully apply.[/cyan]")
 
         def _flatten_dict(self, d: Dict[str, Any], parent_key: str = "", sep: str = "_") -> Dict[str, str]:
             """Flatten nested dict for CSV export."""
@@ -413,7 +492,7 @@ if App is not None:
         async def action_export_results(self) -> None:
             """Export results to JSON or CSV."""
             if not self.scan_results:
-                self.log.write("[yellow]No results to export.[/yellow]")
+                self.logs_widget.write("[yellow]No results to export.[/yellow]")
                 return
 
             try:
@@ -424,7 +503,7 @@ if App is not None:
                 json_file = Path(f"scan_results_{timestamp}.json")
                 with open(json_file, "w") as f:
                     json.dump(self.scan_results, f, indent=2)
-                self.log.write(f"[green]✓ Results exported to {json_file}[/green]")
+                self.logs_widget.write(f"[green]✓ Results exported to {json_file}[/green]")
 
                 # CSV export (flattened)
                 csv_file = Path(f"scan_results_{timestamp}.csv")
@@ -438,9 +517,9 @@ if App is not None:
                             writer = csv.DictWriter(f, fieldnames=sorted(fieldnames))
                             writer.writeheader()
                             writer.writerows(flat_results)
-                        self.log.write(f"[green]✓ Results exported to {csv_file}[/green]")
+                        self.logs_widget.write(f"[green]✓ Results exported to {csv_file}[/green]")
             except Exception as e:
-                self.log.write(f"[red]Export failed: {e}[/red]")
+                self.logs_widget.write(f"[red]Export failed: {e}[/red]")
 
         def _update_status_bar(self, status: str) -> None:
             """Update the status bar at the bottom."""
@@ -476,7 +555,7 @@ if App is not None:
             """Clear all results from the results view."""
             self.results_view.children.clear()
             await self.results_view.mount(Static("Results cleared. Run a new scan to populate.", classes="pretty"))
-            self.log.write("[cyan]Results cleared.[/cyan]")
+            self.logs_widget.write("[cyan]Results cleared.[/cyan]")
 
         async def action_run_scan(self) -> None:
             # Collect selected modules
@@ -484,20 +563,23 @@ if App is not None:
             for child in self.module_container.children:
                 try:
                     if isinstance(child, ModuleCheckbox) and child.value and child.display:
-                        selected.append(child.label)
+                        # use module_name (a string) instead of label (Content) to avoid type errors
+                        selected.append(getattr(child, "module_name", str(child.label)))
                 except Exception:
                     continue
 
-            profile = self.profile_select.value or "quick"
+            # Ensure profile is a plain string (Select.value can be a non-str sentinel in some Textual versions)
+            profile_val = getattr(self.profile_select, "value", None)
+            profile = profile_val if isinstance(profile_val, str) else "quick"
             target = (self.target_input.value or "").strip()
             
             # Validate target
             valid, msg = _validate_target(target)
             if not valid:
-                self.log.write(f"[red]{msg}[/red]")
+                self.logs_widget.write(f"[red]{msg}[/red]")
                 return
 
-            self.log.write(f"[cyan]Running scan: profile={profile} target={target} modules={len(selected)}[/cyan]")
+            self.logs_widget.write(f"[cyan]Running scan: profile={profile} target={target} modules={len(selected)}[/cyan]")
             self._update_status_bar(f"Running scan with {len(selected)} modules...")
             asyncio.create_task(self._run_scan_background(target, selected, profile))
 
@@ -506,7 +588,7 @@ if App is not None:
             try:
                 from core.orchestrator import run_scan_stream
             except Exception as e:
-                self.log.write(f"[red]Failed to import orchestrator: {e}[/red]")
+                self.logs_widget.write(f"[red]Failed to import orchestrator: {e}[/red]")
                 self._update_status_bar(f"Error: Failed to import orchestrator")
                 return
 
@@ -527,7 +609,7 @@ if App is not None:
                     async for item in run_scan_stream(target, profile=profile):
                         if isinstance(item, dict) and item.get("_final"):
                             merged = item.get("merged")
-                            self.log.write("[bold cyan]✓ Scan complete[/bold cyan]")
+                            self.logs_widget.write("[bold cyan]✓ Scan complete[/bold cyan]")
                             self._update_status_bar(f"Scan complete: {len(self.errors_list)} errors, {completed} successful")
                             try:
                                 self.progress_bar.update(progress=100)
@@ -548,11 +630,11 @@ if App is not None:
                                     envelope = {"module": provider, "status": "error", "message": item.get("error")}
 
                             if envelope.get("status") == "ok":
-                                self.log.write(f"[green]✓ {provider} completed[/green]")
+                                self.logs_widget.write(f"[green]✓ {provider} completed[/green]")
                                 self._update_status_bar(f"Running: {provider} completed")
                             else:
                                 error_msg = envelope.get("message") or "Unknown error"
-                                self.log.write(f"[red]✗ {provider} error: {error_msg}[/red]")
+                                self.logs_widget.write(f"[red]✗ {provider} error: {error_msg}[/red]")
                                 # Provide intelligent suggestions for common errors
                                 suggestion = ""
                                 if "timeout" in error_msg.lower():
@@ -577,7 +659,7 @@ if App is not None:
                             except Exception:
                                 pass
                 except Exception as e:
-                    self.log.write(f"[red]Orchestrator stream failed: {e}[/red]")
+                    self.logs_widget.write(f"[red]Orchestrator stream failed: {e}[/red]")
                     self._update_status_bar(f"Error: {str(e)[:50]}")
 
             asyncio.create_task(_consume_stream())
@@ -598,7 +680,7 @@ if App is not None:
 
         async def action_toggle_logs(self) -> None:
             try:
-                self.log.visible = not self.log.visible
+                self.logs_widget.visible = not self.logs_widget.visible
             except Exception:
                 pass
 
