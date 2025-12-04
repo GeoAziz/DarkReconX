@@ -318,6 +318,18 @@ export TOR_ENABLED=false
 
 ---
 
+## CI / Release notes
+
+The repository includes a GitHub Actions workflow that can publish releases to PyPI and push Docker images when you create a tag (vX.Y.Z).
+
+- To enable automated PyPI publishing, add a repository secret named `PYPI_API_TOKEN` with a PyPI API token. The release workflow checks for tag pushes and will only attempt to publish when the token is present.
+- To enable Docker image push, configure `DOCKER_USERNAME` and `DOCKER_PASSWORD` repository secrets and ensure the Dockerfile is present at `docker/Dockerfile`.
+
+Note: The release workflow avoids referencing `secrets.*` directly in YAML `if:` expressions to reduce editor/YAML-language-server false positives. Instead the workflow checks at runtime and skips publishing when required secrets are not configured.
+
+Example: create a token in PyPI and add it in repo settings → Settings → Secrets and variables → Actions → New repository secret (`PYPI_API_TOKEN`).
+
+
 ## 🏗️ Architecture
 
 ### Pipeline Flow
