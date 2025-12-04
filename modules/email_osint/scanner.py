@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, cast
 import re
 
 import dns.resolver
@@ -28,44 +28,51 @@ class EmailOsintModule(BaseModule):
                 # MX
                 try:
                     answers = dns.resolver.resolve(domain, "MX")
+                    # dnspython may return an Answer object or expose an .rrset
                     rrset = getattr(answers, "rrset", None)
-                    if rrset:
-                        for r in rrset:
-                            # r.exchange is a Name object
-                            mx_records.append(str(getattr(r, "exchange", r)).rstrip("."))
+                    iterable: Iterable = rrset if rrset is not None else cast(Iterable, answers)
+                    for r in iterable:
+                        mx_records.append(str(getattr(r, "exchange", r)).rstrip("."))
                 except Exception:
                     mx_records = []
 
                 # TXT -> SPF
                 try:
                     answers = dns.resolver.resolve(domain, "TXT")
+                    found = False
                     rrset = getattr(answers, "rrset", None)
-                    if rrset:
-                        for t in rrset:
-                            if hasattr(t, "strings"):
-                                # dnspython returns bytes in .strings
-                                s = b"".join(t.strings).decode(errors="ignore")
-                            else:
-                                s = str(t)
-                            if s.startswith("v=spf1"):
-                                spf = s
-                                break
+                    iterator: Iterable = rrset if rrset is not None else cast(Iterable, answers)
+                    for t in iterator:
+                        if hasattr(t, "strings"):
+                            s = b"".join(t.strings).decode(errors="ignore")
+                        else:
+                            s = str(t)
+                        if s.lower().startswith("v=spf1"):
+                            spf = s
+                            found = True
+                            break
+                    if not found:
+                        spf = None
                 except Exception:
                     spf = None
                 # DMARC at _dmarc.domain
                 try:
                     d = f"_dmarc.{domain}"
                     answers = dns.resolver.resolve(d, "TXT")
+                    found = False
                     rrset = getattr(answers, "rrset", None)
-                    if rrset:
-                        for t in rrset:
-                            if hasattr(t, "strings"):
-                                s = b"".join(t.strings).decode(errors="ignore")
-                            else:
-                                s = str(t)
-                            if s.lower().startswith("v=dmarc1"):
-                                dmarc = s
-                                break
+                    iterator: Iterable = rrset if rrset is not None else cast(Iterable, answers)
+                    for t in iterator:
+                        if hasattr(t, "strings"):
+                            s = b"".join(t.strings).decode(errors="ignore")
+                        else:
+                            s = str(t)
+                        if s.lower().startswith("v=dmarc1"):
+                            dmarc = s
+                            found = True
+                            break
+                    if not found:
+                        dmarc = None
                 except Exception:
                     dmarc = None
 
