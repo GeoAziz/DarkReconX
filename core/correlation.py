@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Any, Dict, List, Tuple, Mapping
+from typing import Any, Dict, List, Mapping, Tuple
 
 
 def correlate_domains_by_ip(profile: Mapping[str, List[Any]]) -> List[Tuple[str, List[str], float]]:

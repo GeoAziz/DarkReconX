@@ -17,13 +17,14 @@ Or directly: python tests/test_tui_smoke.py
 """
 
 import asyncio
-import json
 import csv
-import tempfile
+import json
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
 import pytest
 
 # Add project root to path
@@ -312,8 +313,8 @@ class TestTUIIntegration:
         """Test that required widgets are available"""
         # These would be textual widgets
         try:
-            from textual.widgets import Static, Input, Button, Select, Label  # type: ignore[reportMissingImports]
             from textual.containers import Container, Horizontal, Vertical  # type: ignore[reportMissingImports]
+            from textual.widgets import Button, Input, Label, Select, Static  # type: ignore[reportMissingImports]
 
             assert Static is not None
             assert Button is not None

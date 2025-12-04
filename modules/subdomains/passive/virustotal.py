@@ -1,5 +1,6 @@
-import aiohttp
 from typing import Optional
+
+import aiohttp
 
 API_URL = "https://www.virustotal.com/api/v3/domains/{}/subdomains"
 API_KEY = None  # Set your API key here or pass as arg

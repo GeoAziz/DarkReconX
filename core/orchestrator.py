@@ -8,7 +8,7 @@ manages rate-limiting and retries, and merges results into a unified output.
 
 import asyncio
 import time
-from typing import Any, Dict, List, Optional, Type, AsyncGenerator
+from typing import Any, AsyncGenerator, Dict, List, Optional, Type
 
 from core.logger import get_logger
 from core.module import BaseModule

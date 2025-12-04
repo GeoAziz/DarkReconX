@@ -14,11 +14,11 @@ from typing import Any, Dict, List, Optional
 
 from jinja2 import Template
 
+from core import fusion as _fusion
 from core.logger import get_logger
 from core.orchestrator import run_scan
+from core.profiles import add_module_usage, load_metadata, save_metadata, update_collection
 from modules.utils.async_verify import batch_http_verify
-from core import fusion as _fusion
-from core.profiles import load_metadata, save_metadata, add_module_usage, update_collection
 
 logger = get_logger("pipeline")
 

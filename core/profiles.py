@@ -3,7 +3,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-
 PROFILES_DIR = Path(__file__).resolve().parents[1] / "profiles"
 
 
@@ -96,6 +95,7 @@ This loader provides a safe fallback and a listing function for the CLI.
 """
 from pathlib import Path
 from typing import Dict
+
 import yaml
 
 

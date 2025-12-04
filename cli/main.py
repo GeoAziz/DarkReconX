@@ -608,7 +608,7 @@ def run_module(module: str, target: Optional[str] = None, ctx=None):
 
         # Normalize result with standardized response shape
         try:
-            from core.output import standard_response, print_json
+            from core.output import print_json, standard_response
 
             resp = standard_response(module, data=result)
             # prefer pretty JSON display
@@ -619,7 +619,7 @@ def run_module(module: str, target: Optional[str] = None, ctx=None):
         console.print(f"[yellow]Module {module} is a placeholder: {e}[/yellow]")
     except Exception as e:
         try:
-            from core.output import standard_response, print_json
+            from core.output import print_json, standard_response
 
             resp = standard_response(module, error=str(e))
             print_json(resp, pretty=True)
@@ -664,7 +664,7 @@ def whois(
     # After retrieval, run fusion to compute confidence and persist profile
     try:
         from core import fusion as _fusion
-        from core.profiles import load_metadata, save_metadata, add_module_usage
+        from core.profiles import add_module_usage, load_metadata, save_metadata
 
         sources = {"whois": result.get("whois") if isinstance(result, dict) and "whois" in result else result}
         fused = _fusion.fuse_domain(domain, sources)
@@ -769,8 +769,8 @@ def graph(
 ):
     """Generate a relationship graph for a target using Graphviz (dot)."""
     try:
-        from core.profiles import get_profile_dir
         from core.correlation import correlate_domains_by_ip, detect_shared_asn
+        from core.profiles import get_profile_dir
 
         profile_dir = get_profile_dir(target)
 
@@ -980,7 +980,7 @@ def subfinder(
         # Run fusion and persist confidence
         try:
             from core import fusion as _fusion
-            from core.profiles import load_metadata, save_metadata, add_module_usage
+            from core.profiles import add_module_usage, load_metadata, save_metadata
 
             sources = {"local_dns": result}
             fused = _fusion.fuse_domain(domain, sources)
@@ -1119,9 +1119,9 @@ def enrich(
         raise typer.Exit(1)
 
     try:
-        from core.unify import unify_provider_data
         from core import fusion as _fusion
-        from core.profiles import load_metadata, save_metadata, add_module_usage
+        from core.profiles import add_module_usage, load_metadata, save_metadata
+        from core.unify import unify_provider_data
 
         unified_record = unify_provider_data(target, target_type, providers_data)
         record_dict = unified_record.to_dict()

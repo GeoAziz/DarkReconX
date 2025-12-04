@@ -1,10 +1,10 @@
-from typing import Any, Dict, List, Optional
 import socket
 import ssl
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from core.module import BaseModule
-from core.output import standard_response, save_output
+from core.output import save_output, standard_response
 
 
 class SSLInfoModule(BaseModule):

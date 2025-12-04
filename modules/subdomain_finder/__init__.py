@@ -18,7 +18,9 @@ except Exception:
     # Create a small shim with the expected functions and a `requests`
     # symbol so tests can monkeypatch network calls.
     import types
+
     import requests as _requests
+
     from core import cache as _cache
 
     api: Any = types.ModuleType("modules.subdomain_finder.api")

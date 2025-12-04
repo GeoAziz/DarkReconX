@@ -10,8 +10,8 @@ import httpx
 
 from core.cache_utils import cache_aware_fetch
 from core.module import BaseModule
-from core.retry import retry
 from core.output import standard_response
+from core.retry import retry
 
 
 class IPInfoModule(BaseModule):

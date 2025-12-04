@@ -1,11 +1,10 @@
-from typing import Any, Dict, Iterable, List, Optional, cast
 import re
+from typing import Any, Dict, Iterable, List, Optional, cast
 
 import dns.resolver
 
 from core.module import BaseModule
-from core.output import standard_response, save_output
-
+from core.output import save_output, standard_response
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 

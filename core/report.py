@@ -1,6 +1,6 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Dict
-from datetime import datetime
 
 from .profiles import get_profile_dir, load_metadata
 

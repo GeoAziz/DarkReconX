@@ -1,5 +1,6 @@
+from typing import Dict, List, cast
+
 from core import correlation
-from typing import cast, Dict, List
 
 
 def test_correlate_domains_by_ip():

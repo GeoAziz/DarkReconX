@@ -12,14 +12,14 @@ Fully interactive TUI with:
 from __future__ import annotations
 
 import asyncio
+import importlib
+import inspect
 import json
 import re
 import sys
 import time
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
-import importlib
-import inspect
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from rich.pretty import Pretty
 from rich.text import Text
@@ -48,8 +48,20 @@ Vertical: Any = None
 if TYPE_CHECKING:
     # Provide names for static type checking (Pylance/mypy) without importing Textual at runtime
     from textual.app import App, ComposeResult  # type: ignore
-    from textual.widgets import Header, Footer, Static, Button, Checkbox, Input, Select, TextLog, ScrollView, ProgressBar, Label  # type: ignore
-    from textual.containers import Horizontal, Vertical, Container  # type: ignore
+    from textual.containers import Container, Horizontal, Vertical  # type: ignore
+    from textual.widgets import (  # type: ignore
+        Button,
+        Checkbox,
+        Footer,
+        Header,
+        Input,
+        Label,
+        ProgressBar,
+        ScrollView,
+        Select,
+        Static,
+        TextLog,
+    )
 else:
     try:
         from importlib import import_module
@@ -75,7 +87,8 @@ else:
     except Exception as _exc:
         # For debugging: print why the Textual imports failed during module import.
         try:
-            import traceback, sys
+            import sys
+            import traceback
 
             traceback.print_exc()
         except Exception:
