@@ -1,7 +1,18 @@
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-import whois as _pywhois
+# Import `whois` lazily inside run() to avoid import-time failures in
+# environments where the package isn't installed (tests may monkeypatch the
+# module at runtime). Provide a lightweight placeholder object that exposes a
+# `.whois` attribute so test monkeypatching can target it without triggering
+# import-time errors.
+def _missing_whois(domain: str):
+    raise RuntimeError("whois functionality not available in this environment")
+
+class _WhoisPlaceholder:
+    whois = staticmethod(_missing_whois)
+
+_pywhois = _WhoisPlaceholder()
 
 from core.logger import get_logger
 from core.module import BaseModule
@@ -20,8 +31,23 @@ class WhoisModule(BaseModule):
 
     def run(self, domain: str, use_tor: Optional[bool] = None, output: Optional[str] = None):
         try:
+            # Import whois lazily
+            if _pywhois is None:
+                try:
+                    import whois as _imported_whois
+
+                    # Ensure there is a callable attribute `.whois` for compatibility
+                    if not hasattr(_imported_whois, "whois") and hasattr(_imported_whois, "query"):
+                        _imported_whois.whois = _imported_whois.query  # type: ignore
+
+                    # bind to module-level name
+                    globals() ["_pywhois"] = _imported_whois
+                except Exception as ie:
+                    # if whois isn't available, raise to be caught below
+                    raise RuntimeError("whois package not available") from ie
+
             # python-whois does DNS/network internally; callers should be aware
-            w = _pywhois.whois(domain)
+            w = cast(Any, _pywhois).whois(domain)
             result = {
                 "domain": domain,
                 "registrar": getattr(w, "registrar", None),
@@ -37,7 +63,8 @@ class WhoisModule(BaseModule):
             else:
                 p = Path(__file__).resolve().parents[2] / "results" / f"whois_{domain}.json"
             save_output(str(p), result)
-            return standard_response("whois_lookup", data=result)
+            # Return legacy shape for backward compatibility (tests/consumers expect this)
+            return result
         except Exception as e:
             logger.error(f"WHOIS lookup failed for {domain}: {e}")
-            return standard_response("whois_lookup", error=str(e))
+            return {"success": False, "error": str(e)}

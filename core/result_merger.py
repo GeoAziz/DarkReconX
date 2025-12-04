@@ -5,7 +5,7 @@ Unified result merging and deduplication logic.
 Combines normalized provider outputs into a single structured JSON result.
 """
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 
 from core.logger import get_logger
 
@@ -43,28 +43,43 @@ class ResultMerger:
             "errors": {},
         }
 
-        # Process each provider
+        # Process each provider (accept both standardized envelope and legacy shapes)
         for provider_name, result in provider_results.items():
             if not isinstance(result, dict):
                 continue
 
+            # If the provider returned a standardized envelope, extract fields
+            if "status" in result:
+                success = result.get("status") == "ok"
+                execution_time = result.get("execution_time_seconds", 0)
+                cached = result.get("cached", False)
+                data = result.get("data")
+                error = result.get("message") or result.get("error")
+            else:
+                # Legacy shape
+                success = result.get("success", False)
+                execution_time = result.get("execution_time_seconds", 0)
+                cached = result.get("cached", False)
+                data = result.get("data")
+                error = result.get("error")
+
             provider_entry = {
-                "success": result.get("success", False),
-                "execution_time_seconds": result.get("execution_time_seconds", 0),
-                "cached": result.get("cached", False),
+                "success": success,
+                "execution_time_seconds": execution_time,
+                "cached": cached,
             }
 
-            if result.get("success"):
+            if success:
                 merged["summary"]["successful_providers"] += 1
 
                 # Extract provider data
-                if "data" in result:
-                    provider_entry["data"] = result["data"]
+                if data is not None:
+                    provider_entry["data"] = data
                     # Merge field-level data into unified sections
-                    ResultMerger._merge_fields(merged["data"], result["data"], provider_name)
+                    ResultMerger._merge_fields(merged["data"], data, provider_name)
             else:
                 merged["summary"]["failed_providers"] += 1
-                merged["errors"][provider_name] = result.get("error", "Unknown error")
+                merged["errors"][provider_name] = error or "Unknown error"
 
             # Store per-provider metadata
             if include_raw and "raw" in result:
@@ -194,14 +209,10 @@ def merge_results(
     if deduplicate:
         # Deduplicate common fields
         if "ips" in merged["data"] and "values" in merged["data"]["ips"]:
-            merged["data"]["ips"]["values"] = ResultDeduplicator.deduplicate_ips(
-                merged["data"]["ips"]["values"]
-            )
+            merged["data"]["ips"]["values"] = ResultDeduplicator.deduplicate_ips(merged["data"]["ips"]["values"])
 
         if "domains" in merged["data"] and "values" in merged["data"]["domains"]:
-            merged["data"]["domains"]["values"] = ResultDeduplicator.deduplicate_domains(
-                merged["data"]["domains"]["values"]
-            )
+            merged["data"]["domains"]["values"] = ResultDeduplicator.deduplicate_domains(merged["data"]["domains"]["values"])
 
         if "dns_records" in merged["data"] and "values" in merged["data"]["dns_records"]:
             merged["data"]["dns_records"]["values"] = ResultDeduplicator.deduplicate_dns_records(
