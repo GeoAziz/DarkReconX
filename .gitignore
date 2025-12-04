@@ -4,6 +4,7 @@ __pycache__/
 .env
 *.pyc
 .env.local
+!.vscode/settings.json
  .venv/
  .pytest_cache/
  .coverage
