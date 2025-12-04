@@ -1,0 +1,44 @@
+# Example scan profiles for DarkReconX
+
+quick:
+  description: "Quick scan - minimal checks, fast"
+  modules:
+    - subdomain_finder
+    - whois_lookup
+    - dns
+    - ssl_info
+  asr:
+    ports: "80,443"
+    safe_mode: true
+
+full:
+  description: "Full scan - includes active checks and verification"
+  modules:
+    - subdomain_finder
+    - whois_lookup
+    - dns
+    - virustotal
+    - ipinfo
+    - github_osint
+    - ssl_info
+    - email_osint
+  asr:
+    ports: "1-1024"
+    safe_mode: false
+
+privacy:
+  description: "Privacy-preserving profile - passive only"
+  modules:
+    - subdomain_finder
+    - whois_lookup
+    - ssl_info
+  asr:
+    ports: "80,443"
+    safe_mode: true
+
+developer:
+  description: "Developer-focused profile for deep OSS/dev persona checks"
+  modules:
+    - github_osint
+    - dns
+    - ssl_info

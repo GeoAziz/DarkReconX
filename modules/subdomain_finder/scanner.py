@@ -11,6 +11,7 @@ from rich.console import Console
 from config.loader import get_config
 from core.http_client import HTTPClient
 from modules.subdomain_finder import api as api_helpers
+from core.output import standard_response
 
 console = Console()
 
@@ -99,13 +100,14 @@ class SubdomainFinder:
         """If True, force refresh API responses and update the cache."""
         self.api_force_refresh = bool(refresh)
 
-    def run(self) -> List[str]:
+    def run(self) -> dict:
         console.print(f"[bold cyan]Starting subdomain enumeration on {self.domain} (workers={self.workers})[/bold cyan]")
         found: List[str] = []
         wl_path = Path(self.wordlist)
         if not wl_path.exists():
             console.print(f"[yellow]Wordlist not found: {wl_path} — no checks performed.[/yellow]")
-            return found
+            data = {"domain": self.domain, "count": 0, "subdomains": []}
+            return standard_response("subdomain_finder", data=data)
 
         # gather candidates
         candidates = [
@@ -224,13 +226,21 @@ class SubdomainFinder:
                 console.print(f"[bold magenta]Enrichment complete — saved {enrich_path}[/bold magenta]")
             except Exception as e:
                 console.print(f"[red]Enrichment failed: {e}[/red]")
+
         # Save skipped results separately for later analysis
         if hasattr(self, "skipped") and self.skipped:
             skip_path = Path.cwd() / f"skipped_results_{self.domain}.txt"
             with skip_path.open("w", encoding="utf-8") as sf:
                 for s in self.skipped:
                     sf.write(s + "\n")
-        return found
+
+        # Build normalized data
+        data = {
+            "domain": self.domain,
+            "count": len(found),
+            "subdomains": found,
+        }
+        return standard_response("subdomain_finder", data=data)
 
 
 if __name__ == "__main__":

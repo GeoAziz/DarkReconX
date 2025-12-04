@@ -8,7 +8,7 @@ manages rate-limiting and retries, and merges results into a unified output.
 
 import asyncio
 import time
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from core.logger import get_logger
 from core.module import BaseModule
@@ -136,9 +136,7 @@ class AsyncOrchestrator:
         # Filter to enabled providers
         providers = [p for p in providers if self.registry.is_enabled(p)]
 
-        logger.info(
-            f"Starting async scan of {target} with {len(providers)} provider(s): {', '.join(providers)}"
-        )
+        logger.info(f"Starting async scan of {target} with {len(providers)} provider(s): {', '.join(providers)}")
 
         start_time = time.time()
         tasks = [self._run_provider(target, provider_name) for provider_name in providers]
@@ -180,8 +178,17 @@ class AsyncOrchestrator:
                 logger.debug(f"Provider {provider_name} completed in {elapsed:.2f}s")
 
                 if isinstance(result, dict):
-                    result["provider"] = provider_name
-                    result["execution_time_seconds"] = elapsed
+                    # Ensure provider is attributed (support both legacy and new envelope)
+                    if "provider" not in result:
+                        # Some modules return the standardized envelope with 'module'/'status'/'data'
+                        # Map that into a provider key for downstream compatibility.
+                        if "module" in result:
+                            result.setdefault("provider", provider_name)
+                        else:
+                            result["provider"] = provider_name
+
+                    # Attach execution time if not present
+                    result.setdefault("execution_time_seconds", elapsed)
                     return result
                 else:
                     return {
@@ -200,9 +207,7 @@ class AsyncOrchestrator:
                 logger.error(f"Provider {provider_name} failed: {e}", exc_info=True)
                 return {"provider": provider_name, "success": False, "error": str(e)}
 
-    def _merge_results(
-        self, target: str, providers: List[str], results: List[Any]
-    ) -> Dict[str, Any]:
+    def _merge_results(self, target: str, providers: List[str], results: List[Any]) -> Dict[str, Any]:
         """Merge provider results into unified output.
 
         Args:
@@ -232,26 +237,40 @@ class AsyncOrchestrator:
             else:
                 normalized_results.append({"success": False, "error": f"Unexpected result type: {type(result)}"})
 
-        # Process each provider result
+        # Process each provider result accepting both new envelope and legacy dict
         for result in normalized_results:
             if not isinstance(result, dict):
                 continue
 
-            provider = result.get("provider", "unknown")
+            # Provider attribution: try 'provider', then standardized 'module', else unknown
+            provider = result.get("provider") or result.get("module") or "unknown"
 
-            if result.get("success"):
+            # Detect standardized envelope (status/data/message)
+            if "status" in result:
+                success = result.get("status") == "ok"
+                data = result.get("data")
+                error = result.get("message")
+                cached = result.get("cached", False)
+            else:
+                # Legacy shape
+                success = result.get("success", False)
+                data = result.get("data")
+                error = result.get("error")
+                cached = result.get("cached", False)
+
+            if success:
                 # Extract data
-                if "data" in result:
-                    merged["data"][provider] = result["data"]
+                if data is not None:
+                    merged["data"][provider] = data
                 # Track cache hit
-                if "cached" in result:
-                    merged["cached_flags"][provider] = result["cached"]
+                if cached:
+                    merged["cached_flags"][provider] = True
             else:
                 # Track error
-                merged["errors"][provider] = result.get("error", "Unknown error")
+                merged["errors"][provider] = error or "Unknown error"
                 merged["success"] = False
 
-        # Overall success only if all succeeded
+        # Overall success only if no errors
         merged["success"] = len(merged["errors"]) == 0
 
         return merged
