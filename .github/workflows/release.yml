@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  test-and-release:
+    runs-on: ubuntu-latest
+    # Restrict token permissions for release job; writing packages requires package permissions
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: release-${{ github.ref_name }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          pip install pytest
+      - name: Run tests
+        run: pytest -q
+      - name: Build distributions
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          python -m build
+
+      - name: Publish to PyPI
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          # To enable automated PyPI publishing, add a repository secret named
+          # PYPI_API_TOKEN (a PyPI API token) and uncomment the env mapping
+          # below. We intentionally avoid referencing ${{ secrets.* }} here to
+          # reduce editor/YAML-language-server false positives in local tooling.
+          if [ -z "${PYPI_API_TOKEN:-}" ]; then
+            echo "PYPI_API_TOKEN not configured as an env var; skipping PyPI publish"
+            echo "To enable: add secret 'PYPI_API_TOKEN' in repo settings and map it to the job env."
+            exit 0
+          fi
+          python -m pip install --upgrade pip
+          pip install twine
+          TWINE_PASSWORD="${PYPI_API_TOKEN}" twine upload dist/*
+
+      - name: Build and push Docker image
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            geoaziz/darkreconx:${{ github.ref_name }}
+            geoaziz/darkreconx:latest
+        # NOTE: To push to Docker Hub, configure DOCKER_USERNAME and
+        # DOCKER_PASSWORD as repository secrets and add a login step before
+        # this action (or set them as env vars for the job). We avoid direct
+        # references to ${{ secrets.* }} in this file to reduce editor warnings.

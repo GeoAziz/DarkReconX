@@ -3,3 +3,11 @@ __pycache__/
 .vscode/
 .env
 *.pyc
+.env.local
+!.vscode/settings.json
+ .venv/
+ .pytest_cache/
+ .coverage
+ results/
+ .cache/
+ .DS_Store

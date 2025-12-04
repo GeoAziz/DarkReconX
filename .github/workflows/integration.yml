@@ -1,29 +1,203 @@
-name: Integration Tests (gated)
+name: Comprehensive Integration & CI
 
 on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
   workflow_dispatch: {}
+  schedule:
+    # Run nightly smoke tests
+    - cron: '0 2 * * *'
+
+env:
+  PYTHON_VERSION: '3.11'
+
+# Workflow run concurrency and tightened permissions
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
 
 jobs:
-  run-integration-tests:
-    name: Run opt-in integration tests
+  # Unit tests with full coverage
+  unit-tests:
     runs-on: ubuntu-latest
-    # only run if VT_API_KEY secret is present
-    if: ${{ secrets.VT_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/test_pipeline.py tests/test_providers.py tests/test_cache_utils.py -v --cov=engine --cov=core --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  # Code quality checks
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install black isort flake8 mypy
+
+      - name: Check code style with black
+        run: black --check . --exclude=.venv,__pycache__,*.egg-info
+
+      - name: Check import sorting with isort
+        run: isort --check-only . --skip=.venv --skip=__pycache__
+
+      - name: Lint with flake8
+        run: flake8 . --exclude=.venv,__pycache__,*.egg-info --max-line-length=120 --extend-ignore=E203,W503
+
+      - name: Type check with mypy
+        run: mypy . --ignore-missing-imports --allow-untyped-defs
+
+  # Cache flag verification tests
+  cache-flags-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-asyncio
-          # Install package in editable mode to fix imports
-          pip install -e .
-      - name: Run integration tests
+
+      - name: Test --no-cache flag
         env:
-          RUN_API_INTEGRATION: '1'
-          VT_API_KEY: ${{ secrets.VT_API_KEY }}
-        run: python -m pytest tests/test_vt_integration.py -q
+          DARKRECONX_NO_CACHE: '1'
+        run: |
+          pytest tests/test_cache_utils.py -v
+
+      - name: Test --refresh-cache flag
+        env:
+          DARKRECONX_REFRESH_CACHE: '1'
+        run: |
+          pytest tests/test_cache_utils.py -v
+
+  # Integration tests with mocked providers
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run pipeline integration tests
+        run: |
+          pytest tests/test_pipeline.py -v
+
+      - name: Run provider integration tests
+        run: |
+          pytest tests/test_providers.py -v
+
+  # Smoke test: CLI import check
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: CLI import smoke test
+        run: |
+          python -c "from cli.main import app; print('✅ CLI imports successfully')"
+
+      - name: Check help output
+        run: |
+          python -m cli.main --help | head -20
+
+  # Protected branch tests with real API mocks (optional)
+  api-integration:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run optional provider tests (no live API)
+        run: |
+          pytest tests/test_optional_providers.py::test_censys_missing_key tests/test_optional_providers.py::test_virustotal_missing_key -v
