@@ -47,8 +47,10 @@ jobs:
           pip install pytest pytest-asyncio pytest-cov
 
       - name: Run unit tests with coverage
+        # Run pytest against the tests/ directory so discovery works regardless
+        # of runner working-directory nuances or file-path mismatches.
         run: |
-          pytest tests/test_pipeline.py tests/test_providers.py tests/test_cache_utils.py -v --cov=engine --cov=core --cov-report=xml --cov-report=term-missing
+          pytest tests -v --cov=engine --cov=core --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to codecov
         uses: codecov/codecov-action@v3
@@ -172,13 +174,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: CLI import smoke test
+      - name: CLI & TUI smoke tests (pytest)
+        # Use pytest to run targeted smoke tests rather than ad-hoc python -c calls.
+        # This ensures consistent test execution and leverages existing smoke tests.
         run: |
-          python -c "from cli.main import app; print('✅ CLI imports successfully')"
-
-      - name: Check help output
-        run: |
-          python -m cli.main --help | head -20
+          pytest tests/test_tui_smoke.py -k "tui_imports or orchestrator_stream_api_exists" -q
 
   # Protected branch tests with real API mocks (optional)
   api-integration:

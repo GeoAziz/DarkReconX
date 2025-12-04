@@ -23,6 +23,27 @@ from pathlib import Path
 from rich.pretty import Pretty
 from rich.text import Text
 
+# Predeclare Textual import targets so static analyzers (Pylance/mypy)
+# won't report them as undefined when the runtime import is guarded.
+textual_app: Any = None
+textual_widgets: Any = None
+textual_containers: Any = None
+App: Any = None
+ComposeResult: Any = None
+Header: Any = None
+Footer: Any = None
+Static: Any = None
+Button: Any = None
+Checkbox: Any = None
+Input: Any = None
+Select: Any = None
+TextLog: Any = None
+ScrollView: Any = None
+ProgressBar: Any = None
+Label: Any = None
+Horizontal: Any = None
+Vertical: Any = None
+
 if TYPE_CHECKING:
     # Provide names for static type checking (Pylance/mypy) without importing Textual at runtime
     from textual.app import App, ComposeResult  # type: ignore
@@ -161,7 +182,7 @@ if App is not None:
     class ModuleCheckbox(Checkbox):
         """Enhanced checkbox with module description."""
         def __init__(self, module_name: str, description: str = "", **kwargs):
-            super().__init__(module_name, **kwargs)
+            super(ModuleCheckbox, self).__init__(module_name, **kwargs)
             self.module_name = module_name
             self.description = description or MODULE_DESCRIPTIONS.get(module_name, "No description")
 
@@ -185,8 +206,11 @@ if App is not None:
             ("h", "show_help", "Help"),
         ]
 
+        # Typing: logs_widget provides a small write(text) API; annotate as Any
+        logs_widget: Any
+
         def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
+            super(TUIMainApp, self).__init__(*args, **kwargs)
             self.view_mode = "json"  # json or table
             self.errors_list: List[Dict[str, Any]] = []
             # store theme preference locally without setting App.theme (may be unregistered)
@@ -233,7 +257,7 @@ if App is not None:
             except Exception:
                 pass
 
-        def compose(self) -> ComposeResult:
+        def compose(self):
             yield Header(show_clock=True)
             yield Static("[b]DarkReconX TUI[/b] — R:Run  M:Modules  P:Profiles  L:Logs  E:Errors  T:View  C:Clear  H:Help  Q:Quit", id="topbar")
             with Horizontal():
@@ -296,7 +320,7 @@ if App is not None:
                         class SimpleLog(Static):
                             def __init__(self, *a, **k):
                                 # initialize with empty content
-                                super().__init__("", *a, **k)
+                                super(SimpleLog, self).__init__("", *a, **k)
                                 self._buffer = ""
 
                             def write(self, text: str) -> None:
@@ -543,19 +567,63 @@ if App is not None:
             if suggestion:
                 error_text += f"\n  [yellow]→ {suggestion}[/yellow]"
             
-            try:
-                # Clear placeholder if this is the first error
-                if len(self.errors_list) == 1:
-                    self.errors_panel.children.clear()
-                await self.errors_panel.mount(Static(error_text, classes="result-entry"))
-            except Exception:
-                pass
+                try:
+                    # Clear placeholder if this is the first error
+                    if len(self.errors_list) == 1:
+                        # Try container-level clear/remove API first (if available)
+                        try:
+                            clear_fn = getattr(self.errors_panel, "clear", None)
+                            if callable(clear_fn):
+                                res = clear_fn()
+                                if asyncio.iscoroutine(res):
+                                    await res
+                            else:
+                                # Fallback: remove child widgets individually if they support remove()
+                                for child in list(self.errors_panel.children):
+                                    try:
+                                        remove_fn = getattr(child, "remove", None)
+                                        if callable(remove_fn):
+                                            res = remove_fn()
+                                            if asyncio.iscoroutine(res):
+                                                await res
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            # As a last resort, reset visible content
+                            try:
+                                self.errors_panel.update("")
+                            except Exception:
+                                pass
+                    await self.errors_panel.mount(Static(error_text, classes="result-entry"))
+                except Exception:
+                    pass
 
         async def action_clear_results(self) -> None:
             """Clear all results from the results view."""
-            self.results_view.children.clear()
+            # Clear children safely: some Textual versions expose a mutable list,
+            # others provide container APIs. Prefer clearing the list if present,
+            # otherwise fall back to replacing content via update().
+            children = getattr(self.results_view, "children", None)
+            if isinstance(children, list):
+                try:
+                    children.clear()
+                except Exception:
+                    try:
+                        self.results_view.update("")
+                    except Exception:
+                        pass
+            else:
+                try:
+                    self.results_view.update("")
+                except Exception:
+                    pass
+
             await self.results_view.mount(Static("Results cleared. Run a new scan to populate.", classes="pretty"))
-            self.logs_widget.write("[cyan]Results cleared.[/cyan]")
+            try:
+                # logs_widget is annotated as Any
+                self.logs_widget.write("[cyan]Results cleared.[/cyan]")
+            except Exception:
+                pass
 
         async def action_run_scan(self) -> None:
             # Collect selected modules
