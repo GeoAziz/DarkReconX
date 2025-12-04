@@ -8,6 +8,7 @@ Fully interactive TUI with:
 - Orchestrator-backed async scanning with live progress
 - Color-coded results and logs
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -52,6 +53,7 @@ if TYPE_CHECKING:
 else:
     try:
         from importlib import import_module
+
         textual_app = import_module("textual.app")
         textual_widgets = import_module("textual.widgets")
         textual_containers = import_module("textual.containers")
@@ -114,12 +116,35 @@ PROFILE_DESCRIPTIONS = {
 }
 
 # Common TLDs for autocomplete
-COMMON_TLDS = ["com", "org", "net", "edu", "gov", "io", "co", "uk", "de", "fr", "us", "ca", "au", "jp", "cn", "in", "br", "ru", "nl", "se", "ch"]
+COMMON_TLDS = [
+    "com",
+    "org",
+    "net",
+    "edu",
+    "gov",
+    "io",
+    "co",
+    "uk",
+    "de",
+    "fr",
+    "us",
+    "ca",
+    "au",
+    "jp",
+    "cn",
+    "in",
+    "br",
+    "ru",
+    "nl",
+    "se",
+    "ch",
+]
 
 
 def _safe_discover_modules() -> List[str]:
     try:
         from core.loader import discover_modules
+
         mods = discover_modules()
         return sorted(list(mods.keys()))
     except Exception:
@@ -129,6 +154,7 @@ def _safe_discover_modules() -> List[str]:
 def _safe_load_profiles() -> Dict[str, Any]:
     try:
         from core.profiles import load_profiles
+
         return load_profiles()
     except Exception:
         return {}
@@ -139,35 +165,39 @@ def _validate_target(target: str) -> tuple[bool, str]:
     target = target.strip()
     if not target:
         return False, "Target cannot be empty"
-    
+
     # Email pattern
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if re.match(email_pattern, target):
         return True, f"✓ Email: {target}"
-    
+
     # IP pattern (simple)
-    ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+    ip_pattern = r"^(\d{1,3}\.){3}\d{1,3}$"
     if re.match(ip_pattern, target):
-        parts = target.split('.')
+        parts = target.split(".")
         if all(0 <= int(p) <= 255 for p in parts):
             return True, f"✓ IP: {target}"
         return False, "Invalid IP address (octets must be 0-255)"
-    
+
     # Domain pattern (basic)
-    domain_pattern = r'^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})?$'
-    if re.match(domain_pattern, target) and '.' in target:
+    domain_pattern = (
+        r"^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})?$"
+    )
+    if re.match(domain_pattern, target) and "." in target:
         return True, f"✓ Domain: {target}"
-    
+
     return False, f"⚠ Invalid format (domain, IP, or email expected)"
 
 
 def _autocomplete_tlds(partial: str) -> List[str]:
     """Return autocomplete suggestions for TLDs."""
     partial_lower = partial.lower()
-    if '.' in partial:
+    if "." in partial:
         # User is typing TLD after domain
-        return [tld for tld in COMMON_TLDS if tld.startswith(partial_lower.split('.')[-1])]
+        return [tld for tld in COMMON_TLDS if tld.startswith(partial_lower.split(".")[-1])]
     return []
+
+
 if App is not None:
     # Provide fallbacks for widget API differences across Textual releases
     TextLog = TextLog or getattr(textual_widgets, "Log", None)
@@ -181,11 +211,11 @@ if App is not None:
 
     class ModuleCheckbox(Checkbox):
         """Enhanced checkbox with module description."""
+
         def __init__(self, module_name: str, description: str = "", **kwargs):
             super(ModuleCheckbox, self).__init__(module_name, **kwargs)
             self.module_name = module_name
             self.description = description or MODULE_DESCRIPTIONS.get(module_name, "No description")
-
 
     class TUIMainApp(App):
         # Avoid loading the provided CSS by default to prevent stylesheet
@@ -222,7 +252,7 @@ if App is not None:
             try:
                 theme_file = Path.home() / ".darkreconx_theme"
                 if theme_file.exists():
-                        return theme_file.read_text().strip() or "light"
+                    return theme_file.read_text().strip() or "light"
             except Exception:
                 pass
             return "light"
@@ -259,7 +289,10 @@ if App is not None:
 
         def compose(self):
             yield Header(show_clock=True)
-            yield Static("[b]DarkReconX TUI[/b] — R:Run  M:Modules  P:Profiles  L:Logs  E:Errors  T:View  C:Clear  H:Help  Q:Quit", id="topbar")
+            yield Static(
+                "[b]DarkReconX TUI[/b] — R:Run  M:Modules  P:Profiles  L:Logs  E:Errors  T:View  C:Clear  H:Help  Q:Quit",
+                id="topbar",
+            )
             with Horizontal():
                 with Vertical(id="left-pane"):
                     yield Static("[b]Modules[/b]", id="modules-title")
@@ -298,6 +331,7 @@ if App is not None:
                     self.errors_panel.visible = False
                     yield self.errors_panel
                     yield Static("[b]Logs[/b]", id="logs-title")
+
                     # Create logs widget with compatibility across Textual versions.
                     def _create_logs_widget():
                         # Try TextLog or Log with common kwargs, falling back on simpler constructors.
@@ -377,7 +411,12 @@ if App is not None:
 
             # Initial results message
             try:
-                await self.results_view.mount(Static("Results will appear here. Select providers, enter a target, and press R or click Run Scan.", classes="pretty"))
+                await self.results_view.mount(
+                    Static(
+                        "Results will appear here. Select providers, enter a target, and press R or click Run Scan.",
+                        classes="pretty",
+                    )
+                )
             except Exception:
                 pass
 
@@ -521,8 +560,9 @@ if App is not None:
 
             try:
                 import csv
+
                 timestamp = time.strftime("%Y%m%d_%H%M%S")
-                
+
                 # JSON export
                 json_file = Path(f"scan_results_{timestamp}.json")
                 with open(json_file, "w") as f:
@@ -555,18 +595,13 @@ if App is not None:
 
         async def _add_error_entry(self, provider: str, error_msg: str, suggestion: str = "") -> None:
             """Add an error to the errors panel."""
-            error_entry = {
-                "provider": provider,
-                "error": error_msg,
-                "suggestion": suggestion,
-                "timestamp": time.time()
-            }
+            error_entry = {"provider": provider, "error": error_msg, "suggestion": suggestion, "timestamp": time.time()}
             self.errors_list.append(error_entry)
-            
+
             error_text = f"[red]✗ {provider}:[/red] {error_msg}"
             if suggestion:
                 error_text += f"\n  [yellow]→ {suggestion}[/yellow]"
-            
+
                 try:
                     # Clear placeholder if this is the first error
                     if len(self.errors_list) == 1:
@@ -640,7 +675,7 @@ if App is not None:
             profile_val = getattr(self.profile_select, "value", None)
             profile = profile_val if isinstance(profile_val, str) else "quick"
             target = (self.target_input.value or "").strip()
-            
+
             # Validate target
             valid, msg = _validate_target(target)
             if not valid:

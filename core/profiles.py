@@ -87,6 +87,8 @@ def add_note(target: str, note: str, author: Optional[str] = None) -> None:
 
 def get_profile_dir(target: str) -> Path:
     return ensure_profile_dir(target)
+
+
 """Profile management for scan presets.
 
 Profiles may live in `config/profiles.yml` or `profiles.yaml` at repo root.

@@ -15,14 +15,18 @@ def test_correlate_domains_by_ip():
     # Expect one correlated IP with two domains
     assert any(r[0] == "1.1.1.1" and set(r[1]) >= {"a.com", "b.com"} for r in res)
 
+
 def test_detect_shared_asn():
-    profile = cast(Dict[str, List[str]], {
-        "domains": [
-            {"domain": "a.com", "asn": "AS1"},
-            {"domain": "b.com", "asn": "AS1"},
-            {"domain": "c.com", "asn": "AS2"},
-        ]
-    })
+    profile = cast(
+        Dict[str, List[str]],
+        {
+            "domains": [
+                {"domain": "a.com", "asn": "AS1"},
+                {"domain": "b.com", "asn": "AS1"},
+                {"domain": "c.com", "asn": "AS2"},
+            ]
+        },
+    )
     res = correlation.detect_shared_asn(profile)
     assert any(r[0] == "AS1" and set(r[1]) >= {"a.com", "b.com"} for r in res)
     assert any(r[0] == "AS1" and set(r[1]) >= {"a.com", "b.com"} for r in res)

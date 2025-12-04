@@ -56,7 +56,7 @@ def print_table(rows: Iterable[dict], columns: Optional[List[str]] = None):
 
 def save_output(path: str, data: Any, *, ensure_dir: bool = True, format: str = "json"):
     """Save output to file in specified format (json, csv).
-    
+
     Args:
         path: Output file path
         data: Data to save
@@ -92,18 +92,18 @@ def _save_csv(path: Path, data: Any):
         # Fallback to JSON if CSV doesn't make sense
         _save_json(path, data)
         return
-    
+
     if not records:
         console.print("[yellow]No data to export to CSV[/yellow]")
         return
-    
+
     # Extract all unique keys from all records
     fieldnames = set()
     for record in records:
         if isinstance(record, dict):
             fieldnames.update(record.keys())
     fieldnames = sorted(list(fieldnames))
-    
+
     with path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
@@ -116,34 +116,31 @@ def _save_csv(path: Path, data: Any):
 
 def setup_file_logging(logfile: Optional[str] = None, log_level: int = logging.INFO) -> Optional[logging.FileHandler]:
     """Setup file-based logging for all operations.
-    
+
     Args:
         logfile: Path to log file. If None, logging is disabled.
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
-    
+
     Returns:
         FileHandler if logfile is set, else None
     """
     if not logfile:
         return None
-    
+
     logpath = Path(logfile)
     logpath.parent.mkdir(parents=True, exist_ok=True)
-    
-    file_handler = logging.FileHandler(logpath, mode='a')
+
+    file_handler = logging.FileHandler(logpath, mode="a")
     file_handler.setLevel(log_level)
-    
+
     # Standard format for log files
-    formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    formatter = logging.Formatter("[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     file_handler.setFormatter(formatter)
-    
+
     # Add to root logger
     root_logger = logging.getLogger()
     root_logger.addHandler(file_handler)
-    
+
     console.print(f"[dim]📝 Logging to: {logpath}[/dim]")
     return file_handler
 

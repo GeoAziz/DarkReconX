@@ -193,10 +193,7 @@ class SubdomainFinder:
                         else:
                             res = {"error": "missing_api_function", "api": self.api_name, "expected": "enrich_with_virustotal"}
                     elif self.api_name in ("dnsdb",):
-                        func = (
-                            getattr(api_helpers, "enrich_with_dnsdb", None)
-                            or getattr(api_helpers, "enrich_dnsdb", None)
-                        )
+                        func = getattr(api_helpers, "enrich_with_dnsdb", None) or getattr(api_helpers, "enrich_dnsdb", None)
                         if callable(func):
                             res = func(
                                 d,
@@ -208,9 +205,8 @@ class SubdomainFinder:
                         else:
                             res = {"error": "missing_api_function", "api": self.api_name, "expected": "enrich_with_dnsdb"}
                     elif self.api_name in ("whoisxml", "whois"):
-                        func = (
-                            getattr(api_helpers, "enrich_with_whoisxml", None)
-                            or getattr(api_helpers, "enrich_whoisxml", None)
+                        func = getattr(api_helpers, "enrich_with_whoisxml", None) or getattr(
+                            api_helpers, "enrich_whoisxml", None
                         )
                         if callable(func):
                             res = func(
@@ -228,9 +224,8 @@ class SubdomainFinder:
                             import socket
 
                             ip = socket.gethostbyname(d)
-                            func = (
-                                getattr(api_helpers, "enrich_with_ipinfo", None)
-                                or getattr(api_helpers, "enrich_ipinfo", None)
+                            func = getattr(api_helpers, "enrich_with_ipinfo", None) or getattr(
+                                api_helpers, "enrich_ipinfo", None
                             )
                             if callable(func):
                                 res = func(
@@ -241,7 +236,12 @@ class SubdomainFinder:
                                     force_refresh=getattr(self, "api_force_refresh", False),
                                 )
                             else:
-                                res = {"error": "missing_api_function", "api": self.api_name, "expected": "enrich_with_ipinfo", "ip": ip}
+                                res = {
+                                    "error": "missing_api_function",
+                                    "api": self.api_name,
+                                    "expected": "enrich_with_ipinfo",
+                                    "ip": ip,
+                                }
                         except Exception:
                             res = {"error": "resolve_failed", "domain": d}
                     else:

@@ -21,7 +21,9 @@ def test_github_osint_exists(monkeypatch):
     def fake_get(url, **kwargs):
         if url.endswith("/nonexistent"):
             return DummyResp(404, {})
-        return DummyResp(200, {"login": "alice", "name": "Alice", "followers": 5, "public_repos": 2, "created_at": "2020-01-01"})
+        return DummyResp(
+            200, {"login": "alice", "name": "Alice", "followers": 5, "public_repos": 2, "created_at": "2020-01-01"}
+        )
 
     monkeypatch.setattr("httpx.get", fake_get)
 

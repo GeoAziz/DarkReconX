@@ -3,6 +3,7 @@
 Small utilities to check for API keys in the environment and provide
 developer-friendly messages when keys are missing.
 """
+
 import os
 from typing import Tuple
 

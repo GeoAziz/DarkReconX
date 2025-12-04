@@ -11,7 +11,7 @@ class FakeSSLSock:
     def getpeercert(self):
         return {
             "subject": ((("commonName", "example.com"),),),
-            "issuer": ((("organizationName", "Let\'s Encrypt"),),),
+            "issuer": ((("organizationName", "Let's Encrypt"),),),
             "notBefore": "Nov 15 12:00:00 2025 GMT",
             "notAfter": "Feb 15 12:00:00 2026 GMT",
             "subjectAltName": (("DNS", "example.com"), ("DNS", "www.example.com")),

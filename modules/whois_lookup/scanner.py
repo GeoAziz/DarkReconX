@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, Optional, cast
 
+
 # Import `whois` lazily inside run() to avoid import-time failures in
 # environments where the package isn't installed (tests may monkeypatch the
 # module at runtime). Provide a lightweight placeholder object that exposes a
@@ -9,8 +10,10 @@ from typing import Any, Optional, cast
 def _missing_whois(domain: str):
     raise RuntimeError("whois functionality not available in this environment")
 
+
 class _WhoisPlaceholder:
     whois = staticmethod(_missing_whois)
+
 
 # Start as None so we attempt a lazy import of a real whois implementation
 # at runtime; tests can still monkeypatch `_pywhois` if needed.
@@ -43,7 +46,7 @@ class WhoisModule(BaseModule):
                         _imported_whois.whois = _imported_whois.query  # type: ignore
 
                     # bind to module-level name
-                    globals() ["_pywhois"] = _imported_whois
+                    globals()["_pywhois"] = _imported_whois
                 except Exception as ie:
                     # if whois isn't available, raise to be caught below
                     raise RuntimeError("whois package not available") from ie

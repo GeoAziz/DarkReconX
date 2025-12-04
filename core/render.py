@@ -3,6 +3,7 @@
 Provides consistent CLI output: headers, tables, pretty JSON, markdown export,
 and a summary builder used across the application.
 """
+
 from __future__ import annotations
 
 import json

@@ -33,4 +33,3 @@ def test_profiles_save_load_and_notes(tmp_path, monkeypatch):
     assert notes.exists()
     content = notes.read_text(encoding="utf-8")
     assert "Investigate ASN" in content
-

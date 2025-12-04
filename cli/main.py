@@ -15,6 +15,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+
 # Normalize repeated -v flags (e.g. -v, -vv) into a single --verbose N before Typer/Cli parses
 # This avoids Click/Typer incompatibilities with count/is_flag across versions.
 def _normalize_argv_verbosity():
@@ -412,6 +413,7 @@ def main(
 
     click_ctx = click.get_current_context(silent=True)
     if click_ctx is None:
+
         class _DummyCtx:
             def __init__(self):
                 # provide obj attribute to match click.Context interface used by the app
@@ -626,7 +628,12 @@ def run_module(module: str, target: Optional[str] = None, ctx=None):
 
 
 @app.command("whois")
-def whois(domain: str, tor: Optional[bool] = typer.Option(None, "--tor", "--no-tor", help="Enable or disable Tor routing (overrides config)"), output: Optional[str] = None, ctx=None):
+def whois(
+    domain: str,
+    tor: Optional[bool] = typer.Option(None, "--tor", "--no-tor", help="Enable or disable Tor routing (overrides config)"),
+    output: Optional[str] = None,
+    ctx=None,
+):
     """WHOIS Lookup Tool"""
     # resolve use_tor from global context if CLI flag not provided
     if ctx is None:
@@ -689,7 +696,10 @@ def tui():
 
 
 @app.command("note")
-def note(target: str = typer.Argument(..., help="Target identifier (domain)"), add: Optional[str] = typer.Option(None, "--add", help="Add a note to the target")):
+def note(
+    target: str = typer.Argument(..., help="Target identifier (domain)"),
+    add: Optional[str] = typer.Option(None, "--add", help="Add a note to the target"),
+):
     """Add or show analyst notes for a target profile."""
     try:
         from core.profiles import add_note, get_profile_dir
@@ -708,13 +718,17 @@ def note(target: str = typer.Argument(..., help="Target identifier (domain)"), a
 
 
 @app.command("report")
-def report(target: str = typer.Argument(..., help="Target identifier (domain)"), output: Optional[str] = typer.Option(None, "--output", "-o", help="Output HTML path")):
+def report(
+    target: str = typer.Argument(..., help="Target identifier (domain)"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output HTML path"),
+):
     """Generate an HTML intelligence report for a target."""
     try:
         from core.profiles import get_profile_dir, load_metadata
         from core.report import generate_html_report
 
         profile_dir = get_profile_dir(target)
+
         # Gather collections
         def _load_json(name):
             p = profile_dir / f"{name}.json"
@@ -749,7 +763,10 @@ def report(target: str = typer.Argument(..., help="Target identifier (domain)"),
 
 
 @app.command("graph")
-def graph(target: str = typer.Argument(..., help="Target identifier (domain)"), output: Optional[str] = typer.Option(None, "--output", "-o", help="Output image path (png)")):
+def graph(
+    target: str = typer.Argument(..., help="Target identifier (domain)"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output image path (png)"),
+):
     """Generate a relationship graph for a target using Graphviz (dot)."""
     try:
         from core.profiles import get_profile_dir
@@ -773,7 +790,7 @@ def graph(target: str = typer.Argument(..., help="Target identifier (domain)"), 
             # coerce to str and escape double quotes for DOT labels
             return str(s).replace('"', '\\"')
 
-        lines = ["digraph G {", "rankdir=LR;", "compound=true;", "node [style=filled, fontname=\"Helvetica\"];"]
+        lines = ["digraph G {", "rankdir=LR;", "compound=true;", 'node [style=filled, fontname="Helvetica"];']
 
         domain_nodes = []
         ip_nodes = []
@@ -785,12 +802,12 @@ def graph(target: str = typer.Argument(..., help="Target identifier (domain)"), 
             if isinstance(d, str):
                 name = d
                 domain_nodes.append(name)
-                lines.append(f'"{esc(name)}" [shape=oval, fillcolor=\"#E6F0FF\", color=\"#2B6CB0\", label=\"{esc(name)}\"];')
+                lines.append(f'"{esc(name)}" [shape=oval, fillcolor="#E6F0FF", color="#2B6CB0", label="{esc(name)}"];')
             elif isinstance(d, dict):
                 name = d.get("domain") or d.get("name")
                 domain_nodes.append(name)
                 label = esc(name)
-                lines.append(f'"{esc(name)}" [shape=oval, fillcolor=\"#E6F0FF\", color=\"#2B6CB0\", label=\"{label}\"];')
+                lines.append(f'"{esc(name)}" [shape=oval, fillcolor="#E6F0FF", color="#2B6CB0", label="{label}"];')
                 # capture ASN if present
                 if d.get("asn"):
                     asn = str(d.get("asn"))
@@ -804,7 +821,7 @@ def graph(target: str = typer.Argument(..., help="Target identifier (domain)"), 
             if isinstance(ip, str) and ip not in ip_nodes:
                 ip_nodes.append(ip)
         for ip in sorted(set(ip_nodes)):
-            lines.append(f'"{esc(ip)}" [shape=rect, fillcolor=\"#FFF4E6\", color=\"#D97706\", label=\"{esc(ip)}\"];')
+            lines.append(f'"{esc(ip)}" [shape=rect, fillcolor="#FFF4E6", color="#D97706", label="{esc(ip)}"];')
 
         # if domains contained emails or social entries, include them
         # detect emails in domain dicts
@@ -815,14 +832,14 @@ def graph(target: str = typer.Argument(..., help="Target identifier (domain)"), 
                     emails = [emails]
                 for e in emails:
                     email_nodes.append(e)
-                    lines.append(f'"{esc(e)}" [shape=note, fillcolor=\"#ECFCCB\", color=\"#15803D\", label=\"{esc(e)}\"];')
+                    lines.append(f'"{esc(e)}" [shape=note, fillcolor="#ECFCCB", color="#15803D", label="{esc(e)}"];')
 
         # add ASN cluster subgraphs for visual grouping
         for asn, members in asn_map.items():
             safe_asn = esc(asn).replace(".", "_")
             lines.append(f"subgraph cluster_asn_{safe_asn} {{")
             lines.append(f'  label = "ASN {esc(asn)}";')
-            lines.append('  style=filled;')
+            lines.append("  style=filled;")
             lines.append('  color="#F3E8FF";')
             for m in members:
                 lines.append(f'  "{esc(m)}";')
@@ -1244,7 +1261,7 @@ if __name__ == "__main__":
                                 k += 1
                             if k < len(lines) and lines[k].strip().startswith('"""'):
                                 doc_line = lines[k].strip().lstrip('"""').strip()
-                                doc = doc_line.split('\n', 1)[0]
+                                doc = doc_line.split("\n", 1)[0]
                             commands.append((cmd_name, doc))
                             i = j
                     i += 1
