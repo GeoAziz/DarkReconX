@@ -207,7 +207,7 @@ def _read_config() -> dict:
         return {}
 
 
-def _format_output(data: dict, format_type: str = "pretty") -> None:
+def _format_output(data: dict, format_type: str = "pretty", verbosity: int = 0) -> None:
     """
     Format and display UnifiedRecord output.
 
@@ -215,35 +215,47 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
         data: UnifiedRecord data as dictionary
         format_type: Output format - "json", "pretty", or "min"
     """
+    # Prefer a centralized renderer if available (new Day 23 UX)
+    try:
+        from core import render as _render  # type: ignore
+
+        # Try to determine verbosity from click/typer context if available if not passed
+        try:
+            import click
+
+            ctx = click.get_current_context(silent=True)
+            if verbosity == 0 and ctx is not None and getattr(ctx, "obj", None):
+                verbosity = int(ctx.obj.get("verbosity", 0))
+        except Exception:
+            pass
+
+        _render.render_output(data, format_type=format_type, verbosity=verbosity)
+        return
+    except Exception:
+        # Fall back to built-in formatting for backwards compatibility
+        pass
+
     if format_type == "json":
-        # Raw JSON output
         console.print(json.dumps(data, indent=2))
 
     elif format_type == "min":
-        # Minimal output - just key facts
         console.print(f"Target: {data.get('target', 'N/A')}")
         console.print(f"Type: {data.get('type', 'N/A')}")
 
-        # Show resolved IPs if available
         resolved = data.get("resolved", {})
         if resolved.get("ip"):
             console.print(f"IPs: {', '.join(resolved['ip'][:3])}")
 
-        # Show risk if available
         risk = data.get("risk", {})
         if risk.get("malicious"):
             console.print(f"[bold red]⚠️  MALICIOUS (Score: {risk.get('score', 'N/A')})[/bold red]")
 
-        # Show network location if available
         network = data.get("network", {})
         if network.get("country"):
             location = f"{network.get('city', '')}, {network.get('country', '')}".strip(", ")
             console.print(f"Location: {location}")
 
     elif format_type == "pretty":
-        # Rich formatted output using tables and panels
-
-        # Header panel
         target = data.get("target", "Unknown")
         target_type = data.get("type", "Unknown")
         source = data.get("source", "Unknown")
@@ -254,7 +266,6 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
 
         console.print(Panel(header, title="[bold yellow]Target Information[/bold yellow]", box=box.ROUNDED))
 
-        # DNS Resolution table
         resolved = data.get("resolved", {})
         if any(resolved.values()):
             dns_table = Table(title="DNS Resolution", box=box.SIMPLE)
@@ -268,11 +279,10 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
             if resolved.get("ns"):
                 dns_table.add_row("NS", "\n".join(resolved["ns"]))
             if resolved.get("txt"):
-                dns_table.add_row("TXT", "\n".join(resolved["txt"][:3]))  # Limit TXT records
+                dns_table.add_row("TXT", "\n".join(resolved["txt"][:3]))
 
             console.print(dns_table)
 
-        # WHOIS Information table
         whois = data.get("whois", {})
         if any(v for v in whois.values() if v):
             whois_table = Table(title="WHOIS Information", box=box.SIMPLE)
@@ -296,7 +306,6 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
 
             console.print(whois_table)
 
-        # Network Information table
         network = data.get("network", {})
         if any(network.values()):
             net_table = Table(title="Network Information", box=box.SIMPLE)
@@ -318,7 +327,6 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
 
             console.print(net_table)
 
-        # Risk Assessment panel
         risk = data.get("risk", {})
         if risk.get("score") is not None or risk.get("malicious") or risk.get("categories"):
             risk_content = ""
@@ -345,7 +353,8 @@ def _format_output(data: dict, format_type: str = "pretty") -> None:
 @app.callback(invoke_without_command=True)
 def main(
     tor: Optional[bool] = typer.Option(None, "--tor/--no-tor", help="Enable or disable Tor routing (overrides config)"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose exception output"),
+    format: str = typer.Option("pretty", "--format", "-f", help="Output format: pretty|json|md"),
+    verbose: int = typer.Option(0, "--verbose", "-v", help="Increase verbosity (use -v or -vv)", count=True),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Reduce console output"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Skip cache reads and writes"),
     refresh_cache: bool = typer.Option(False, "--refresh-cache", help="Force refresh and update cache"),
@@ -382,7 +391,8 @@ def main(
     # store in context for subcommands to access
     ctx.obj = ctx.obj or {}
     ctx.obj["use_tor"] = use_tor
-    ctx.obj["verbose"] = bool(verbose)
+    ctx.obj["verbosity"] = int(verbose)
+    ctx.obj["format"] = format
     ctx.obj["quiet"] = bool(quiet)
     # cache flags exposed to modules
     ctx.obj["no_cache"] = bool(no_cache)
@@ -579,7 +589,35 @@ def whois(domain: str, tor: Optional[bool] = None, output: Optional[str] = None,
         raise typer.Exit(1)
 
     mod = WhoisModule()
-    mod.run(domain, use_tor=use_tor, output=output)
+    try:
+        # Prefer structured output if the module exposes it
+        if callable(getattr(mod, "run_structured", None)):
+            result = mod.run_structured(domain, use_tor=use_tor, output=output)
+        else:
+            result = mod.run(domain, use_tor=use_tor, output=output)
+    except Exception as e:
+        console.print(f"[red]WHOIS module failed: {e}[/red]")
+        raise typer.Exit(1)
+
+    # After retrieval, run fusion to compute confidence and persist profile
+    try:
+        from core import fusion as _fusion
+        from core.profiles import load_metadata, save_metadata, add_module_usage
+
+        sources = {"whois": result.get("whois") if isinstance(result, dict) and "whois" in result else result}
+        fused = _fusion.fuse_domain(domain, sources)
+        meta = load_metadata(domain) or {}
+        meta["confidence"] = fused.get("confidence", 0.0)
+        save_metadata(domain, meta)
+        add_module_usage(domain, "whois")
+    except Exception:
+        pass
+
+    # Render output using centralized renderer if available (respect --format / -v)
+    ctx_obj = getattr(ctx, "obj", {}) or {}
+    output_format = ctx_obj.get("format", "pretty")
+    verbosity = int(ctx_obj.get("verbosity", 0))
+    _format_output(result if isinstance(result, dict) else {"result": result}, output_format, verbosity)
 
 
 @app.command("tui")
@@ -593,6 +631,206 @@ def tui():
     except Exception as e:
         console.print(f"[red]Failed to launch TUI: {e}[/red]")
         console.print("Ensure `textual` is installed: pip install textual rich")
+
+
+@app.command("note")
+def note(target: str = typer.Argument(..., help="Target identifier (domain)"), add: Optional[str] = typer.Option(None, "--add", help="Add a note to the target")):
+    """Add or show analyst notes for a target profile."""
+    try:
+        from core.profiles import add_note, get_profile_dir
+
+        if add:
+            add_note(target, add)
+            console.print(f"[green]Note added to profile:{get_profile_dir(target)}[/green]")
+        else:
+            notes = get_profile_dir(target) / "notes.md"
+            if notes.exists():
+                console.print(notes.read_text(encoding="utf-8"))
+            else:
+                console.print("[yellow]No notes found for target[/yellow]")
+    except Exception as e:
+        console.print(f"[red]Failed to write/read notes: {e}[/red]")
+
+
+@app.command("report")
+def report(target: str = typer.Argument(..., help="Target identifier (domain)"), output: Optional[str] = typer.Option(None, "--output", "-o", help="Output HTML path")):
+    """Generate an HTML intelligence report for a target."""
+    try:
+        from core.profiles import get_profile_dir, load_metadata
+        from core.report import generate_html_report
+
+        profile_dir = get_profile_dir(target)
+        # Gather collections
+        def _load_json(name):
+            p = profile_dir / f"{name}.json"
+            if p.exists():
+                try:
+                    import json
+
+                    return json.loads(p.read_text(encoding="utf-8"))
+                except Exception:
+                    return []
+            return []
+
+        profile = {
+            "domains": _load_json("domains"),
+            "ips": _load_json("ips"),
+            "emails": _load_json("emails"),
+        }
+
+        meta = load_metadata(target)
+        # Attach a simple fused confidence if present
+        profile["confidence"] = meta.get("confidence", 0.0)
+
+        if output:
+            out = Path(output)
+        else:
+            out = Path(__file__).resolve().parents[1] / "reports" / f"{target}.html"
+
+        path = generate_html_report(target, profile, out)
+        console.print(f"[green]Report generated: {path}[/green]")
+    except Exception as e:
+        console.print(f"[red]Failed to generate report: {e}[/red]")
+
+
+@app.command("graph")
+def graph(target: str = typer.Argument(..., help="Target identifier (domain)"), output: Optional[str] = typer.Option(None, "--output", "-o", help="Output image path (png)")):
+    """Generate a relationship graph for a target using Graphviz (dot)."""
+    try:
+        from core.profiles import get_profile_dir
+        from core.correlation import correlate_domains_by_ip, detect_shared_asn
+
+        profile_dir = get_profile_dir(target)
+
+        import json
+
+        domains = []
+        ips = []
+        p_domains = profile_dir / "domains.json"
+        p_ips = profile_dir / "ips.json"
+        if p_domains.exists():
+            domains = json.loads(p_domains.read_text(encoding="utf-8"))
+        if p_ips.exists():
+            ips = json.loads(p_ips.read_text(encoding="utf-8"))
+
+        # Build a richer dot graph with node types, edge labels and ASN clustering
+        def esc(s) -> str:
+            # coerce to str and escape double quotes for DOT labels
+            return str(s).replace('"', '\\"')
+
+        lines = ["digraph G {", "rankdir=LR;", "compound=true;", "node [style=filled, fontname=\"Helvetica\"];"]
+
+        domain_nodes = []
+        ip_nodes = []
+        email_nodes = []
+        asn_map = {}
+
+        # add domain nodes
+        for d in domains:
+            if isinstance(d, str):
+                name = d
+                domain_nodes.append(name)
+                lines.append(f'"{esc(name)}" [shape=oval, fillcolor=\"#E6F0FF\", color=\"#2B6CB0\", label=\"{esc(name)}\"];')
+            elif isinstance(d, dict):
+                name = d.get("domain") or d.get("name")
+                domain_nodes.append(name)
+                label = esc(name)
+                lines.append(f'"{esc(name)}" [shape=oval, fillcolor=\"#E6F0FF\", color=\"#2B6CB0\", label=\"{label}\"];')
+                # capture ASN if present
+                if d.get("asn"):
+                    asn = str(d.get("asn"))
+                    asn_map.setdefault(asn, []).append(name)
+                # capture associated IPs
+                if d.get("ip"):
+                    ip_nodes.append(d.get("ip"))
+
+        # add ip nodes
+        for ip in ips:
+            if isinstance(ip, str) and ip not in ip_nodes:
+                ip_nodes.append(ip)
+        for ip in sorted(set(ip_nodes)):
+            lines.append(f'"{esc(ip)}" [shape=rect, fillcolor=\"#FFF4E6\", color=\"#D97706\", label=\"{esc(ip)}\"];')
+
+        # if domains contained emails or social entries, include them
+        # detect emails in domain dicts
+        for d in domains:
+            if isinstance(d, dict):
+                emails = d.get("emails") or d.get("email") or []
+                if isinstance(emails, str):
+                    emails = [emails]
+                for e in emails:
+                    email_nodes.append(e)
+                    lines.append(f'"{esc(e)}" [shape=note, fillcolor=\"#ECFCCB\", color=\"#15803D\", label=\"{esc(e)}\"];')
+
+        # add ASN cluster subgraphs for visual grouping
+        for asn, members in asn_map.items():
+            safe_asn = esc(asn).replace(".", "_")
+            lines.append(f"subgraph cluster_asn_{safe_asn} {{")
+            lines.append(f'  label = "ASN {esc(asn)}";')
+            lines.append('  style=filled;')
+            lines.append('  color="#F3E8FF";')
+            for m in members:
+                lines.append(f'  "{esc(m)}";')
+            lines.append("}")
+
+        # add edges: domain -> ip (resolves), domain -> email (owner), ip -> asn (if present in domain dicts)
+        # domain->ip
+        for d in domains:
+            if isinstance(d, dict) and d.get("ip"):
+                dom = esc(d.get("domain"))
+                ip = esc(d.get("ip"))
+                lines.append(f'"{dom}" -> "{ip}" [label="resolves", color="#9CA3AF", penwidth=1.2];')
+
+        # domain->email
+        for d in domains:
+            if isinstance(d, dict):
+                name = esc(d.get("domain") or d.get("name"))
+                emails = d.get("emails") or d.get("email") or []
+                if isinstance(emails, str):
+                    emails = [emails]
+                for e in emails:
+                    lines.append(f'"{name}" -> "{esc(e)}" [label="contact", color="#86EFAC", penwidth=1.0];')
+
+        # shared IP correlations as dashed edges with confidence label from correlation helper
+        try:
+            profile = {"domains": domains}
+            shared = correlate_domains_by_ip(profile)
+            for ip, doms, conf in shared:
+                for dom in doms:
+                    lines.append(f'"{esc(dom)}" -> "{esc(ip)}" [label="shared ({conf})", style=dashed, color="#F59E0B"];')
+        except Exception:
+            pass
+
+        lines.append("}")
+
+        dot = "\n".join(lines)
+        # determine output paths
+        if output:
+            out = Path(output)
+        else:
+            out = Path(__file__).resolve().parents[1] / "reports" / f"{target}.png"
+
+        out.parent.mkdir(parents=True, exist_ok=True)
+
+        # Try to render with graphviz if installed (use dynamic import to avoid static import errors)
+        try:
+            import importlib
+
+            graphviz = importlib.import_module("graphviz")
+            g = graphviz.Source(dot)
+            g.render(str(out.with_suffix("")), format="png", cleanup=True)
+            console.print(f"[green]Graph image generated: {out}[/green]")
+        except Exception:
+            # fallback: write dot file
+            try:
+                dot_path = out.with_suffix(".dot")
+                dot_path.write_text(dot, encoding="utf-8")
+                console.print(f"[yellow]graphviz not available — wrote DOT to {dot_path}[/yellow]")
+            except Exception as e:
+                console.print(f"[red]Failed to write DOT file: {e}[/red]")
+
+    except Exception as e:
+        console.print(f"[red]Failed to generate graph: {e}[/red]")
 
 
 # --- DAY 11 SUBDOMAIN ENUM ENGINE CLI ---
@@ -610,6 +848,7 @@ def subfinder(
     vt_api_key: Optional[str] = typer.Option(None, "--vt-api-key", help="VirusTotal API key for passive enum"),
     concurrency: int = typer.Option(200, "--concurrency", help="Max async DNS concurrency"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output path (JSON)"),
+    ctx=None,
 ):
     """
     Hybrid Subdomain Enumeration Engine (Passive, Active, Permutations, Validation)
@@ -658,12 +897,37 @@ def subfinder(
             json.dump(result, f, indent=2)
         console.print(f"[green]Saved results to {out_path}[/green]")
     else:
-        console.print(f"[bold cyan]Subdomain enumeration complete for {domain}[/bold cyan]")
-        console.print(f"[yellow]Discovered {result['count']} subdomains[/yellow]")
-        for sub in result["subdomains"][:20]:
-            console.print(f" - {sub}")
-        if result["count"] > 20:
-            console.print(f"...and {result['count']-20} more. See results/subdomains/{domain}.json")
+        # Prefer centralized renderer if available; build a consistent record shape
+        record = {
+            "target": domain,
+            "type": "subdomains",
+            "count": result.get("count", 0),
+            "subdomains": result.get("subdomains", []),
+        }
+
+        # Run fusion and persist confidence
+        try:
+            from core import fusion as _fusion
+            from core.profiles import load_metadata, save_metadata, add_module_usage
+
+            sources = {"local_dns": result}
+            fused = _fusion.fuse_domain(domain, sources)
+            meta = load_metadata(domain) or {}
+            meta["confidence"] = fused.get("confidence", 0.0)
+            save_metadata(domain, meta)
+            add_module_usage(domain, "subfinder")
+        except Exception:
+            pass
+
+        # Determine format/verbosity from ctx if provided
+        if ctx is not None:
+            ctx_obj = getattr(ctx, "obj", {}) or {}
+        else:
+            ctx_obj = {}
+        output_format = ctx_obj.get("format", "pretty")
+        verbosity = int(ctx_obj.get("verbosity", 0))
+
+        _format_output(record, output_format, verbosity)
 
 
 @app.command("enrich")
@@ -784,12 +1048,35 @@ def enrich(
 
     try:
         from core.unify import unify_provider_data
+        from core import fusion as _fusion
+        from core.profiles import load_metadata, save_metadata, add_module_usage
 
         unified_record = unify_provider_data(target, target_type, providers_data)
         record_dict = unified_record.to_dict()
 
+        # Run fusion to compute confidence and persist into metadata
+        try:
+            fused = _fusion.fuse_domain(target, providers_data)
+            meta = load_metadata(target) or {}
+            meta["confidence"] = fused.get("confidence", 0.0)
+            save_metadata(target, meta)
+            add_module_usage(target, "enrich")
+            for p in provider_list:
+                add_module_usage(target, f"provider_{p}")
+        except Exception:
+            # best-effort: fusion should not break the enrich flow
+            pass
+
+        # Collect format/verbosity propagated from global callback (if any)
+        if ctx is not None:
+            ctx_obj = getattr(ctx, "obj", {}) or {}
+        else:
+            ctx_obj = {}
+        output_format = ctx_obj.get("format", output_format)
+        verbosity = int(ctx_obj.get("verbosity", 0))
+
         # Display output
-        _format_output(record_dict, output_format)
+        _format_output(record_dict, output_format, verbosity)
 
         # Save if requested
         if save:

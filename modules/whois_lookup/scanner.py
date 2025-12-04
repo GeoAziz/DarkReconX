@@ -55,16 +55,32 @@ class WhoisModule(BaseModule):
                 "expiration_date": str(getattr(w, "expiration_date", None)),
                 "name_servers": getattr(w, "name_servers", None),
             }
-            # print to console
-            print_json(result)
             # save to results folder if requested
             if output:
                 p = Path(output)
             else:
                 p = Path(__file__).resolve().parents[2] / "results" / f"whois_{domain}.json"
-            save_output(str(p), result)
-            # Return legacy shape for backward compatibility (tests/consumers expect this)
+            try:
+                save_output(str(p), result)
+            except Exception:
+                # best-effort save; don't fail the module if saving isn't possible
+                logger.debug("Failed to save whois result to %s", p)
+
+            # Return structured result for CLI renderer or downstream consumers
             return result
         except Exception as e:
             logger.error(f"WHOIS lookup failed for {domain}: {e}")
             return {"success": False, "error": str(e)}
+
+    def run_structured(self, domain: str, use_tor: Optional[bool] = None, output: Optional[str] = None) -> dict:
+        """Return a structured record suitable for the renderer/CLI.
+
+        This wrapper keeps the original `run` signature but normalizes the
+        return shape to include a `target` and `type` so the renderer can
+        display it consistently with other modules.
+        """
+        res = self.run(domain, use_tor=use_tor, output=output)
+        if isinstance(res, dict) and res.get("success") is False:
+            return {"target": domain, "type": "whois", "whois": {}, "error": res.get("error")}
+
+        return {"target": domain, "type": "whois", "whois": res}

@@ -101,7 +101,7 @@ class SubdomainFinder:
         self.api_force_refresh = bool(refresh)
 
     def run(self) -> List[str]:
-        console.print(f"[bold cyan]Starting subdomain enumeration on {self.domain} (workers={self.workers})[/bold cyan]")
+        # Operate silently; return list of found subdomains for backward compatibility
         found: List[str] = []
         wl_path = Path(self.wordlist)
         if not wl_path.exists():
@@ -156,7 +156,7 @@ class SubdomainFinder:
                     self.skipped.append(res)
                     continue
 
-                console.print(f"[green]+ Found: {res}[/green]")
+                # collect found subdomain
                 found.append(res)
 
         # Save results to results/ under project root (caller may override)
@@ -169,7 +169,7 @@ class SubdomainFinder:
                 fh.write(d + "\n")
         # Also return list for caller to persist in other formats
 
-        console.print(f"[bold yellow]Enumeration complete! Found {len(found)} subdomains[/bold yellow]")
+        # Enumeration complete; return results to caller for rendering
         # If an API integration is configured, enrich results (cached)
         if self.api_name and self.api_key:
             try:
@@ -251,9 +251,18 @@ class SubdomainFinder:
 
                 enrich_path = results_dir / f"results_{self.domain}_enriched.json"
                 enrich_path.write_text(json.dumps(enriched, indent=2), encoding="utf-8")
-                console.print(f"[bold magenta]Enrichment complete — saved {enrich_path}[/bold magenta]")
+                # caller may choose to render enrichment info; do not print here
             except Exception as e:
-                console.print(f"[red]Enrichment failed: {e}[/red]")
+                # record the failure and continue; caller can inspect 'enriched' results
+                logger = None
+                try:
+                    from core.logger import get_logger
+
+                    logger = get_logger("subdomain_finder")
+                except Exception:
+                    logger = None
+                if logger:
+                    logger.error("Enrichment failed: %s", e)
 
         # Save skipped results separately for later analysis
         if hasattr(self, "skipped") and self.skipped:
@@ -262,15 +271,13 @@ class SubdomainFinder:
                 for s in self.skipped:
                     sf.write(s + "\n")
 
-        # Save skipped results separately for later analysis
-        if hasattr(self, "skipped") and self.skipped:
-            skip_path = Path.cwd() / f"skipped_results_{self.domain}.txt"
-            with skip_path.open("w", encoding="utf-8") as sf:
-                for s in self.skipped:
-                    sf.write(s + "\n")
-
-        # Return list for backwards compatibility
+        # Return list for backward compatibility
         return found
+
+    def run_structured(self) -> dict:
+        """Run enumeration and return a structured result dict suitable for the renderer."""
+        found = self.run()
+        return {"target": self.domain, "count": len(found), "subdomains": found, "skipped": getattr(self, "skipped", [])}
 
 
 if __name__ == "__main__":
