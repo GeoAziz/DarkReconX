@@ -120,7 +120,7 @@ class ProviderRateLimiter:
         Returns:
             Wait time in seconds.
         """
-        return self.backoff_factor ** attempt
+        return self.backoff_factor**attempt
 
 
 class GlobalRateLimitManager:
@@ -147,9 +147,7 @@ class GlobalRateLimitManager:
         Returns:
             ProviderRateLimiter instance.
         """
-        limiter = ProviderRateLimiter(
-            provider_id, tokens_per_second, bucket_capacity, max_retries
-        )
+        limiter = ProviderRateLimiter(provider_id, tokens_per_second, bucket_capacity, max_retries)
         self._limiters[provider_id] = limiter
         logger.debug(f"Registered rate limit for {provider_id}: {tokens_per_second} tok/s")
         return limiter
@@ -197,9 +195,7 @@ class GlobalRateLimitManager:
 
                 if attempt < limiter.max_retries:
                     wait_time = limiter.backoff_time(attempt)
-                    logger.warning(
-                        f"[{provider_id}] Status {status}, retrying in {wait_time:.2f}s..."
-                    )
+                    logger.warning(f"[{provider_id}] Status {status}, retrying in {wait_time:.2f}s...")
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"[{provider_id}] Max retries exceeded after status {status}")

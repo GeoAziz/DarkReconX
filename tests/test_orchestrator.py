@@ -124,9 +124,7 @@ class TestAsyncOrchestrator:
     async def test_run_multiple_providers_concurrent(self, registry):
         """Test concurrent execution of multiple providers."""
         orchestrator = AsyncOrchestrator(registry, max_concurrent=2)
-        result = await orchestrator.run_providers(
-            "example.com", providers=["mock1", "mock2"]
-        )
+        result = await orchestrator.run_providers("example.com", providers=["mock1", "mock2"])
 
         assert result["target"] == "example.com"
         assert "mock1" in result["data"]
@@ -159,9 +157,7 @@ class TestAsyncOrchestrator:
 
         orchestrator = AsyncOrchestrator(registry)
         # Note: profile="fast" would select dns and whois from FAST profile
-        result = await orchestrator.run_providers(
-            "example.com", profile=ScanProfile.FAST
-        )
+        result = await orchestrator.run_providers("example.com", profile=ScanProfile.FAST)
 
         # Fast profile should include enabled providers
         assert "profile" in result

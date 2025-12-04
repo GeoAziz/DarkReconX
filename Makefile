@@ -1,3 +1,22 @@
+PYPI_PACKAGE=darkreconx
+VERSION=0.1.0
+
+.PHONY: build docker-build release test lint
+
+build:
+	python -m build
+
+docker-build:
+	docker build -t geoaziz/darkreconx:$(VERSION) -f docker/Dockerfile .
+
+release: build
+	@echo "Release artifacts created in dist/. Use twine to upload if desired."
+
+test:
+	pytest -q
+
+lint:
+	black .
 .PHONY: help install install-dev test lint fmt check-fmt clean clean-cache clean-pyc clean-test coverage pre-commit-install ci
 
 help:

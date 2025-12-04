@@ -5,7 +5,7 @@ Performance profiling and benchmarking utilities.
 
 import time
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from core.logger import get_logger
 
@@ -61,9 +61,7 @@ class PerformanceMetrics:
         # Calculate stats
         successful = sum(1 for m in self.provider_metrics.values() if m["success"])
         cached = sum(1 for m in self.provider_metrics.values() if m["cached"])
-        total_provider_time = sum(
-            m["duration_seconds"] for m in self.provider_metrics.values()
-        )
+        total_provider_time = sum(m["duration_seconds"] for m in self.provider_metrics.values())
 
         return {
             "target": self.target,
@@ -103,9 +101,7 @@ class PerformanceMetrics:
         for provider in summary["provider_breakdown"]:
             status = "✓" if provider["success"] else "✗"
             cached_flag = " (cached)" if provider["cached"] else ""
-            lines.append(
-                f"  {status} {provider['provider']}: {provider['duration_seconds']:.3f}s{cached_flag}"
-            )
+            lines.append(f"  {status} {provider['provider']}: {provider['duration_seconds']:.3f}s{cached_flag}")
 
         return "\n".join(lines)
 

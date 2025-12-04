@@ -27,7 +27,8 @@ def test_email_osint(monkeypatch):
                 return [DummyTXT("v=spf1 include:_spf.example.com ~all")]
         raise Exception("No records")
 
-    monkeypatch.setattr("dns.resolver.resolve", fake_resolve)
+    # Patch the resolver used by the module directly to avoid interference
+    monkeypatch.setattr(emod.dns.resolver, "resolve", fake_resolve)
 
     res = emod.EmailOsintModule().run("alice@example.com")
     assert res["status"] == "ok"

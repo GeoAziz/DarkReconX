@@ -8,7 +8,7 @@ manages rate-limiting and retries, and merges results into a unified output.
 
 import asyncio
 import time
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, AsyncGenerator
 
 from core.logger import get_logger
 from core.module import BaseModule
@@ -275,6 +275,50 @@ class AsyncOrchestrator:
 
         return merged
 
+    async def run_providers_stream(
+        self,
+        target: str,
+        providers: Optional[List[str]] = None,
+        profile: str = ScanProfile.FULL,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Async generator that yields provider results as they complete.
+
+        Yields per-provider result dicts (same shape as _run_provider returns).
+        After all providers finish, yields a final merged dict under the key '_final'.
+        """
+        # Determine which providers to run
+        if providers is None:
+            providers = ScanProfile.get_providers(profile)
+
+        if "all" in providers:
+            providers = list(self.registry._providers.keys())
+
+        # Filter to enabled providers
+        providers = [p for p in providers if self.registry.is_enabled(p)]
+
+        logger.info(f"Starting async scan stream of {target} with {len(providers)} provider(s): {', '.join(providers)}")
+
+        start_time = time.time()
+
+        tasks = {asyncio.create_task(self._run_provider(target, provider_name)): provider_name for provider_name in providers}
+
+        results = []
+        for fut in asyncio.as_completed(list(tasks.keys())):
+            res = await fut
+            results.append(res)
+            # yield individual provider result
+            yield res
+
+        elapsed = time.time() - start_time
+        logger.info(f"Async scan stream completed in {elapsed:.2f}s")
+
+        merged = self._merge_results(target, providers, results)
+        merged["scan_duration_seconds"] = elapsed
+        merged["profile"] = profile
+
+        # Final envelope to signal completion
+        yield {"_final": True, "merged": merged}
+
 
 async def run_scan(
     target: str,
@@ -296,3 +340,24 @@ async def run_scan(
     registry = get_registry()
     orchestrator = AsyncOrchestrator(registry, max_concurrent, timeout_per_provider)
     return await orchestrator.run_providers(target, profile=profile)
+
+
+async def run_scan_stream(
+    target: str,
+    profile: str = ScanProfile.FULL,
+    max_concurrent: int = 5,
+    timeout_per_provider: float = 30.0,
+) -> AsyncGenerator[Dict[str, Any], None]:
+    """Convenience async generator that yields provider results as they arrive.
+
+    Example usage:
+        async for item in run_scan_stream("example.com", profile="fast"):
+            if item.get("_final"):
+                do_final(item["merged"])
+            else:
+                handle_provider(item)
+    """
+    registry = get_registry()
+    orchestrator = AsyncOrchestrator(registry, max_concurrent, timeout_per_provider)
+    async for item in orchestrator.run_providers_stream(target, profile=profile):
+        yield item

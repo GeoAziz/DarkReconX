@@ -3,8 +3,7 @@
   "yaml.validate": false,
   // Map GitHub Actions schema to workflow files to reduce false positives in some editors
   "yaml.schemas": {
-    "https://json.schemastore.org/github-workflow.json": 
-      ".github/workflows/*"
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*"
   },
   "editor.formatOnSave": true,
   "files.exclude": {
