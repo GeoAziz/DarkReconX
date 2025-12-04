@@ -15,9 +15,10 @@ class _WhoisPlaceholder:
     whois = staticmethod(_missing_whois)
 
 
-# Start as None so we attempt a lazy import of a real whois implementation
-# at runtime; tests can still monkeypatch `_pywhois` if needed.
-_pywhois = None
+# Start with a lightweight placeholder so tests can monkeypatch
+# attributes on `_pywhois` (e.g. `.whois`) without the real `whois`
+# package being installed at import time.
+_pywhois = _WhoisPlaceholder()
 
 from core.logger import get_logger
 from core.module import BaseModule
@@ -36,8 +37,16 @@ class WhoisModule(BaseModule):
 
     def run(self, domain: str, use_tor: Optional[bool] = None, output: Optional[str] = None):
         try:
-            # Import whois lazily
-            if _pywhois is None:
+            # Import whois lazily. If `_pywhois` is still the placeholder,
+            # attempt to load a real implementation and bind it to the
+            # module name. Tests that monkeypatch `_pywhois.whois` will
+            # be able to do so because `_pywhois` is always an object.
+            # Only attempt to import a real `whois` implementation if the
+            # placeholder still exposes the default missing handler. If a
+            # test has already monkeypatched `_pywhois.whois`, avoid
+            # overwriting it so tests can inject fakes.
+            placeholder_whois = getattr(_pywhois, "whois", None)
+            if isinstance(_pywhois, _WhoisPlaceholder) and (placeholder_whois is None or placeholder_whois is _missing_whois):
                 try:
                     import whois as _imported_whois
 
