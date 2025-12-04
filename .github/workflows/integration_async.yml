@@ -1,0 +1,41 @@
+name: Integration Async Verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  async-integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          pip install httpx pytest pytest-asyncio
+      - name: Run async verification tests
+        run: pytest tests/test_async_verify.py -v
+      - name: Run cache management tests
+        run: pytest tests/test_cache_utils.py -v
+      - name: Verify HTTP verification integration
+        run: |
+          python -c "
+          import asyncio
+          from modules.utils.async_verify import http_verify
+          result = asyncio.run(http_verify('https://example.com', timeout=10))
+          assert result['url'] == 'https://example.com'
+          print(f'✓ HTTP verification works: {result}')
+          "
