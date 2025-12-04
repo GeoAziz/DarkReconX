@@ -100,14 +100,13 @@ class SubdomainFinder:
         """If True, force refresh API responses and update the cache."""
         self.api_force_refresh = bool(refresh)
 
-    def run(self) -> dict:
+    def run(self) -> List[str]:
         console.print(f"[bold cyan]Starting subdomain enumeration on {self.domain} (workers={self.workers})[/bold cyan]")
         found: List[str] = []
         wl_path = Path(self.wordlist)
         if not wl_path.exists():
             console.print(f"[yellow]Wordlist not found: {wl_path} — no checks performed.[/yellow]")
-            data = {"domain": self.domain, "count": 0, "subdomains": []}
-            return standard_response("subdomain_finder", data=data)
+            return []
 
         # gather candidates
         candidates = [
@@ -178,42 +177,71 @@ class SubdomainFinder:
                 for d in found:
                     res = None
                     if self.api_name in ("virustotal", "vt"):
-                        res = api_helpers.enrich_with_virustotal(
-                            d,
-                            self.api_key,
-                            use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
-                            ttl=3600,
-                            force_refresh=getattr(self, "api_force_refresh", False),
+                        func = (
+                            getattr(api_helpers, "enrich_with_virustotal", None)
+                            or getattr(api_helpers, "enrich_virustotal", None)
+                            or getattr(api_helpers, "virustotal_enrich", None)
                         )
+                        if callable(func):
+                            res = func(
+                                d,
+                                self.api_key,
+                                use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
+                                ttl=3600,
+                                force_refresh=getattr(self, "api_force_refresh", False),
+                            )
+                        else:
+                            res = {"error": "missing_api_function", "api": self.api_name, "expected": "enrich_with_virustotal"}
                     elif self.api_name in ("dnsdb",):
-                        res = api_helpers.enrich_with_dnsdb(
-                            d,
-                            self.api_key,
-                            use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
-                            ttl=3600,
-                            force_refresh=getattr(self, "api_force_refresh", False),
+                        func = (
+                            getattr(api_helpers, "enrich_with_dnsdb", None)
+                            or getattr(api_helpers, "enrich_dnsdb", None)
                         )
+                        if callable(func):
+                            res = func(
+                                d,
+                                self.api_key,
+                                use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
+                                ttl=3600,
+                                force_refresh=getattr(self, "api_force_refresh", False),
+                            )
+                        else:
+                            res = {"error": "missing_api_function", "api": self.api_name, "expected": "enrich_with_dnsdb"}
                     elif self.api_name in ("whoisxml", "whois"):
-                        res = api_helpers.enrich_with_whoisxml(
-                            d,
-                            self.api_key,
-                            use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
-                            ttl=3600,
-                            force_refresh=getattr(self, "api_force_refresh", False),
+                        func = (
+                            getattr(api_helpers, "enrich_with_whoisxml", None)
+                            or getattr(api_helpers, "enrich_whoisxml", None)
                         )
+                        if callable(func):
+                            res = func(
+                                d,
+                                self.api_key,
+                                use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
+                                ttl=3600,
+                                force_refresh=getattr(self, "api_force_refresh", False),
+                            )
+                        else:
+                            res = {"error": "missing_api_function", "api": self.api_name, "expected": "enrich_with_whoisxml"}
                     elif self.api_name in ("ipinfo",):
                         # ipinfo expects IP address; try resolving first (best-effort)
                         try:
                             import socket
 
                             ip = socket.gethostbyname(d)
-                            res = api_helpers.enrich_with_ipinfo(
-                                ip,
-                                self.api_key,
-                                use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
-                                ttl=3600,
-                                force_refresh=getattr(self, "api_force_refresh", False),
+                            func = (
+                                getattr(api_helpers, "enrich_with_ipinfo", None)
+                                or getattr(api_helpers, "enrich_ipinfo", None)
                             )
+                            if callable(func):
+                                res = func(
+                                    ip,
+                                    self.api_key,
+                                    use_cache=self.api_use_cache if hasattr(self, "api_use_cache") else True,
+                                    ttl=3600,
+                                    force_refresh=getattr(self, "api_force_refresh", False),
+                                )
+                            else:
+                                res = {"error": "missing_api_function", "api": self.api_name, "expected": "enrich_with_ipinfo", "ip": ip}
                         except Exception:
                             res = {"error": "resolve_failed", "domain": d}
                     else:
@@ -234,13 +262,15 @@ class SubdomainFinder:
                 for s in self.skipped:
                     sf.write(s + "\n")
 
-        # Build normalized data
-        data = {
-            "domain": self.domain,
-            "count": len(found),
-            "subdomains": found,
-        }
-        return standard_response("subdomain_finder", data=data)
+        # Save skipped results separately for later analysis
+        if hasattr(self, "skipped") and self.skipped:
+            skip_path = Path.cwd() / f"skipped_results_{self.domain}.txt"
+            with skip_path.open("w", encoding="utf-8") as sf:
+                for s in self.skipped:
+                    sf.write(s + "\n")
+
+        # Return list for backwards compatibility
+        return found
 
 
 if __name__ == "__main__":

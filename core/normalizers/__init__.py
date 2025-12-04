@@ -14,10 +14,10 @@ Author: DarkReconX Contributors
 Date: December 3, 2025 - Day 9
 """
 
+from .dns import normalize_dns
 from .ipinfo import normalize_ipinfo
 from .virustotal import normalize_virustotal
 from .whoisxml import normalize_whoisxml
-from .dns import normalize_dns
 
 __all__ = [
     "normalize_ipinfo",

@@ -1,5 +1,35 @@
 # Contributing to DarkReconX
 
+Thank you for your interest! We welcome contributions that improve the codebase, docs, tests, and developer experience. Please follow these guidelines to make a smooth contribution.
+
+Testing
+
+- Run unit tests: `pytest`
+- Run a subset: `pytest tests/test_somefile.py`
+- Use a virtualenv and install dev deps: `pip install -e .[dev]`
+
+Style
+
+- We use Black, isort and flake8. Use `pre-commit` to run hooks automatically.
+
+Module contract
+
+- Modules under `modules/` should expose a `scanner.py` with a `run(target, config)` entrypoint that returns a normalized result dict.
+
+Pull requests
+
+- Fork -> branch -> PR. Keep PRs small and focused. Include tests for new behavior.
+- Include a short description and link to related issues.
+
+Branching
+
+- `main` is protected. Use feature branches and open PRs against `main`.
+
+Security
+
+- Do not commit secrets. Use `.env` and `.env.example`. Report security issues via `SECURITY.md`.
+# Contributing to DarkReconX
+
 Thank you for your interest in contributing to DarkReconX! This document provides guidelines and instructions for contributing code, tests, and documentation.
 
 ## Table of Contents

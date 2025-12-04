@@ -44,8 +44,19 @@ class IPInfoModule(BaseModule):
                 cache_aware_fetch(key, _fetch, refresh_cache=refresh, no_cache=no_cache, max_age=86400)
             )
         except Exception as e:
-            return standard_response("ipinfo", error=str(e))
+            # Backwards-compatible error shape for callers/tests
+            resp = standard_response("ipinfo", error=str(e))
+            resp["provider"] = self.provider
+            resp["success"] = False
+            resp["error"] = str(e)
+            return resp
 
-        # Return normalized structure
+        # Return normalized structure but keep legacy top-level keys for compatibility
         data_out = {"provider": self.provider, "data": data, "cached": from_cache}
-        return standard_response("ipinfo", data=data_out)
+        resp = standard_response("ipinfo", data=data_out)
+        # legacy fields expected by older callers/tests
+        resp["provider"] = self.provider
+        resp["success"] = True
+        resp["data"] = data
+        resp["cached"] = from_cache
+        return resp

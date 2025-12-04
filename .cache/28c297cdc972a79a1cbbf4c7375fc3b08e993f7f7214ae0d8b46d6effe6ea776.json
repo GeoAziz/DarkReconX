@@ -1,1 +1,1 @@
-{"_ts": 1764740382, "value": {"WhoisRecord": {"domainName": "example.com", "registryData": {"registrant": {"name": "Example"}}}}}
+{"_ts": 1764851393, "value": {"provider": "whoisxml", "registrar": "Example", "domain": "example.com", "raw": {"WhoisRecord": {"domainName": "example.com", "registryData": {"registrant": {"name": "Example"}}}}}}

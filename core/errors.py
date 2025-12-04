@@ -2,12 +2,13 @@
 
 Standardized error types for providers and orchestration.
 """
+from typing import Optional
 
 
 class ProviderError(Exception):
     """Base error for provider-related failures."""
 
-    def __init__(self, provider_id: str, message: str, status_code: int = None):
+    def __init__(self, provider_id: str, message: str, status_code: Optional[int] = None):
         """Initialize provider error.
 
         Args:
@@ -24,8 +25,8 @@ class ProviderError(Exception):
 class RateLimitError(ProviderError):
     """Provider rate limit exceeded."""
 
-    def __init__(self, provider_id: str, retry_after: int = None):
-        super().__init__(provider_id, f"Rate limit exceeded", status_code=429)
+    def __init__(self, provider_id: str, retry_after: Optional[int] = None):
+        super().__init__(provider_id, "Rate limit exceeded", status_code=429)
         self.retry_after = retry_after
 
 
@@ -72,7 +73,7 @@ class NoProvidersAvailableError(ScanError):
     """No providers available for scan."""
 
     def __init__(self, target: str, reason: str = ""):
-        msg = f"No providers available for scan"
+        msg = "No providers available for scan"
         if reason:
             msg += f": {reason}"
         super().__init__(target, msg)
